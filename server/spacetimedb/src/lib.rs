@@ -32,3 +32,11 @@ pub fn say_hello(ctx: &ReducerContext) {
     }
     log::info!("Hello, World!");
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn it_works() {
+        assert_eq!(2 + 2, 4);
+    }
+}

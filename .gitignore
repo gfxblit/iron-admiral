@@ -8,9 +8,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 .pnpm-debug.log*
+.pnpm-store/
 
 # Rust
-/target/
+target/
 **/*.rs.bk
 Cargo.lock
 
