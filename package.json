@@ -1,0 +1,9 @@
+{
+  "name": "iron-admiral-root",
+  "private": true,
+  "scripts": {
+    "lint": "cd client && npm run lint",
+    "test": "cd client && npm run test -- --coverage",
+    "build": "cd client && npm run build"
+  }
+}
