@@ -54,7 +54,7 @@ jobs:
           name: client-dist
           path: client/dist/
 
-  backend-validation:
+  server-validation:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -121,8 +121,8 @@ jobs:
           publish_dir: ./dist
           keep_files: false
 
-  backend-deployment:
-    needs: backend-validation
+  server-deployment:
+    needs: server-validation
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
