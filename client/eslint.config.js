@@ -1,14 +1,8 @@
 import js from "@eslint/js";
+import tseslint from 'typescript-eslint';
 
-export default [
-  {
-    ignores: ["dist/**", "coverage/**"]
-  },
+export default tseslint.config(
+  { ignores: ["dist/**", "coverage/**"] },
   js.configs.recommended,
-  {
-    rules: {
-      "no-unused-vars": "off",
-      "no-undef": "off"
-    }
-  }
-];
+  ...tseslint.configs.recommended
+);
