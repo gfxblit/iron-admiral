@@ -1,0 +1,140 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  client-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          
+      - name: Install pnpm
+        run: npm install -g pnpm
+        
+      - name: Install dependencies
+        working-directory: ./client
+        run: pnpm install
+        
+      - name: Lint
+        working-directory: ./client
+        run: pnpm lint
+        
+      - name: Test
+        working-directory: ./client
+        run: pnpm test
+        
+      - name: Set base path for PR
+        if: github.event_name == 'pull_request'
+        run: echo "VITE_BASE_PATH=/iron-admiral/pr-${{ github.event.pull_request.number }}/" >> $GITHUB_ENV
+        
+      - name: Set base path for Main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: echo "VITE_BASE_PATH=/iron-admiral/" >> $GITHUB_ENV
+        
+      - name: Build
+        working-directory: ./client
+        run: pnpm build
+        
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-dist
+          path: client/dist/
+
+  server-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+          
+      - name: Check formatting
+        working-directory: ./server/spacetimedb
+        run: cargo fmt --check
+        
+      - name: Lint
+        working-directory: ./server/spacetimedb
+        run: cargo clippy -- -D warnings
+        
+      - name: Test
+        working-directory: ./server/spacetimedb
+        run: cargo test
+
+  client-deployment:
+    needs: client-validation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: client-dist
+          path: dist
+
+      - name: Deploy PR Preview
+        if: github.event_name == 'pull_request'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          destination_dir: pr-${{ github.event.pull_request.number }}
+          keep_files: true
+
+      - name: Comment PR Preview URL
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = `https://${context.repo.owner}.github.io/${context.repo.repo}/pr-${context.issue.number}/`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚀 PR Preview deployed at: ${url}`
+            });
+
+      - name: Deploy Production
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          keep_files: false
+
+  server-deployment:
+    needs: server-validation
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install SpacetimeDB CLI
+        run: |
+          curl -sL https://install.spacetimedb.com | sh
+          echo "$HOME/.spacetimedb" >> $GITHUB_PATH
+        
+      - name: Publish to SpacetimeDB
+        working-directory: ./server
+        run: spacetime publish iron-admiral
+        env:
+          SPACETIMEDB_TOKEN: ${{ secrets.SPACETIMEDB_TOKEN }}

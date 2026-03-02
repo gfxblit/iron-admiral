@@ -17,9 +17,9 @@ A Top-Down Tactical Naval Simulation powered by a Rust-based SpaceTimeDB server 
 
 ### Prerequisites
 
-- [Rust](https://rustup.rs/)
-- [Node.js / pnpm](https://pnpm.io/)
-- [SpaceTimeDB CLI](https://spacetimedb.com/docs/getting-started/cli)
+- [Rust](https://rustup.rs/) (MacOS: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
+- [Node.js / pnpm](https://pnpm.io/) (MacOS: `brew install node pnpm`)
+- [SpaceTimeDB CLI](https://spacetimedb.com/docs/getting-started/cli) (MacOS: `curl -fsSL https://install.spacetimedb.com | sh`)
 
 ### Backend (Server)
 
