@@ -129,12 +129,12 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Install SpacetimeDB CLI
-        run: curl -sL https://install.spacetimedb.com | sh
+        run: |
+          curl -sL https://install.spacetimedb.com | sh
+          echo "$HOME/.spacetimedb" >> $GITHUB_PATH
         
       - name: Publish to SpacetimeDB
         working-directory: ./server
-        run: |
-          export PATH="$HOME/.spacetimedb:$HOME/.local/bin:$PATH"
-          spacetime publish iron-admiral
+        run: spacetime publish iron-admiral
         env:
           SPACETIMEDB_TOKEN: ${{ secrets.SPACETIMEDB_TOKEN }}
