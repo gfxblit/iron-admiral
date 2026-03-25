@@ -1,4 +1,6 @@
-use spacetimedb::{table, Identity, ScheduleAt, SpacetimeType};
+use crate::reducers::physics::physics_tick;
+use crate::types::Waypoint;
+use spacetimedb::{table, Identity, ScheduleAt};
 
 #[table(accessor = player, public)]
 pub struct Player {
@@ -6,13 +8,6 @@ pub struct Player {
     pub identity: Identity,
     pub name: String,
     pub online: bool,
-}
-
-#[derive(SpacetimeType, Clone, Debug, PartialEq)]
-pub struct Waypoint {
-    pub x: f32,
-    pub y: f32,
-    pub target_speed: f32,
 }
 
 #[table(accessor = ship, public)]
@@ -28,7 +23,7 @@ pub struct Ship {
     pub waypoint: Option<Waypoint>,
 }
 
-#[table(accessor = physics_timer, scheduled(crate::reducers::physics_tick))]
+#[table(accessor = physics_timer, scheduled(physics_tick))]
 pub struct PhysicsTimer {
     #[primary_key]
     #[auto_inc]
