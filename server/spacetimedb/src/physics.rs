@@ -1,9 +1,10 @@
-use crate::tables::Waypoint;
+use crate::types::Waypoint;
 use std::f32::consts::PI;
 
 pub const MAX_TURN_RATE: f32 = 1.0; // Radians per second
 pub const MAX_ACCELERATION: f32 = 2.0; // Units per second squared
 pub const TICK_RATE_MS: u64 = 100; // 10Hz
+pub const ARRIVAL_DISTANCE: f32 = 1.0;
 
 pub fn calculate_kinematics(
     x: f32,
@@ -22,19 +23,13 @@ pub fn calculate_kinematics(
         let distance = (dx * dx + dy * dy).sqrt();
 
         // Arrival tolerance
-        if distance <= 1.0 {
-            return (wp.x, wp.y, heading, speed, None);
+        if distance <= ARRIVAL_DISTANCE {
+            return (wp.x, wp.y, heading, wp.target_speed, None);
         }
 
         let target_heading = dy.atan2(dx);
 
-        let mut diff = target_heading - heading;
-        while diff > PI {
-            diff -= 2.0 * PI;
-        }
-        while diff < -PI {
-            diff += 2.0 * PI;
-        }
+        let diff = (target_heading - heading + PI).rem_euclid(2.0 * PI) - PI;
 
         let max_turn = MAX_TURN_RATE * dt;
         if diff > max_turn {
@@ -45,12 +40,7 @@ pub fn calculate_kinematics(
             new_heading = target_heading;
         }
 
-        while new_heading > PI {
-            new_heading -= 2.0 * PI;
-        }
-        while new_heading < -PI {
-            new_heading += 2.0 * PI;
-        }
+        new_heading = (new_heading + PI).rem_euclid(2.0 * PI) - PI;
 
         let speed_diff = wp.target_speed - speed;
         let max_accel = MAX_ACCELERATION * dt;
@@ -61,6 +51,10 @@ pub fn calculate_kinematics(
         } else {
             new_speed = wp.target_speed;
         }
+    }
+
+    if new_speed < 0.0 {
+        new_speed = 0.0;
     }
 
     let new_x = x + new_speed * new_heading.cos() * dt;
@@ -100,6 +94,26 @@ mod tests {
     }
 
     #[test]
+    fn test_kinematics_arrive_at_waypoint_preserves_target_speed() {
+        let wp = Waypoint {
+            x: 0.5,
+            y: 0.0,
+            target_speed: 5.0,
+        };
+        // We are within ARRIVAL_DISTANCE of the waypoint
+        let (x, y, _heading, speed, next_wp) =
+            calculate_kinematics(0.0, 0.0, 0.0, 10.0, Some(wp), 0.1);
+
+        assert_eq!(x, 0.5);
+        assert_eq!(y, 0.0);
+        assert_eq!(
+            speed, 5.0,
+            "Speed should be updated to waypoint target speed upon arrival"
+        );
+        assert_eq!(next_wp, None);
+    }
+
+    #[test]
     fn test_kinematics_arrive_at_waypoint() {
         let wp = Waypoint {
             x: 0.5,
@@ -107,11 +121,12 @@ mod tests {
             target_speed: 0.0,
         };
         // We are within 1.0 of the waypoint
-        let (x, y, _heading, _speed, next_wp) =
+        let (x, y, _heading, speed, next_wp) =
             calculate_kinematics(0.0, 0.0, 0.0, 10.0, Some(wp), 0.1);
 
         assert_eq!(x, 0.5);
         assert_eq!(y, 0.0);
+        assert_eq!(speed, 0.0);
         assert_eq!(next_wp, None);
     }
 
@@ -126,7 +141,7 @@ mod tests {
         let (_x, _y, _heading, speed, _next_wp) =
             calculate_kinematics(0.0, 0.0, 0.0, 0.0, Some(wp), 0.1);
 
-        assert_eq!(speed, 0.2); // This will fail initially because calculate_kinematics doesn't accelerate
+        assert_eq!(speed, 0.2);
     }
 
     #[test]
@@ -159,5 +174,108 @@ mod tests {
         assert!((x - 10.0).abs() <= 1.0);
         assert!((y - 10.0).abs() <= 1.0);
         assert!(ticks < 200, "Should arrive before 200 ticks");
+    }
+
+    #[test]
+    fn test_stop_after_arrival() {
+        let wp = Waypoint {
+            x: 5.0,
+            y: 0.0,
+            target_speed: 0.0,
+        };
+        let mut x = 0.0;
+        let mut y = 0.0;
+        let mut heading = 0.0;
+        let mut speed = 10.0;
+        let mut current_wp = Some(wp);
+        let dt = 0.1;
+
+        for _ in 0..100 {
+            let (new_x, new_y, new_heading, new_speed, new_wp) =
+                calculate_kinematics(x, y, heading, speed, current_wp.clone(), dt);
+            x = new_x;
+            y = new_y;
+            heading = new_heading;
+            speed = new_speed;
+            current_wp = new_wp;
+        }
+
+        assert!(current_wp.is_none());
+        assert_eq!(speed, 0.0, "Speed should be 0 after stopping at waypoint");
+        assert!((x - 5.0).abs() < 1.1);
+    }
+
+    #[test]
+    fn test_kinematics_turn_limit() {
+        let wp = Waypoint {
+            x: -10.0,
+            y: 0.0,
+            target_speed: 10.0,
+        };
+        let (_x, _y, heading, _speed, _next_wp) =
+            calculate_kinematics(0.0, 0.0, -PI + 0.1, 10.0, Some(wp), 0.1);
+
+        assert!((heading - (-PI)).abs() < 0.0001 || (heading - PI).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_kinematics_turn_and_accelerate() {
+        let wp = Waypoint {
+            x: 10.0,
+            y: 10.0,
+            target_speed: 10.0,
+        };
+        let (x, y, heading, speed, _next_wp) =
+            calculate_kinematics(0.0, 0.0, 0.0, 0.0, Some(wp), 0.1);
+
+        assert!(heading > 0.0 && heading <= 0.10001);
+        assert_eq!(speed, 0.2);
+        assert!(x > 0.0);
+        assert!(y > 0.0);
+    }
+
+    #[test]
+    fn test_kinematics_overshoot_and_circle_back() {
+        let wp = Waypoint {
+            x: -1.0,
+            y: 0.0,
+            target_speed: 10.0,
+        };
+        let mut x = 0.0;
+        let mut y = 0.0;
+        let mut heading = 0.0;
+        let mut speed = 10.0;
+        let mut current_wp = Some(wp);
+        let dt = 0.1;
+
+        let mut ticks = 0;
+        while current_wp.is_some() && ticks < 500 {
+            let (new_x, new_y, new_heading, new_speed, new_wp) =
+                calculate_kinematics(x, y, heading, speed, current_wp.clone(), dt);
+            x = new_x;
+            y = new_y;
+            heading = new_heading;
+            speed = new_speed;
+            current_wp = new_wp;
+            ticks += 1;
+        }
+
+        assert!(current_wp.is_none());
+        assert!((x - (-1.0)).abs() <= 1.0);
+        assert!((y - 0.0).abs() <= 1.0);
+    }
+
+    #[test]
+    fn test_negative_target_speed() {
+        let wp = Waypoint {
+            x: 10.0,
+            y: 0.0,
+            target_speed: -5.0,
+        };
+        // Initial speed 0, target speed -5.0. Should NOT become negative.
+        let (_x, _y, _heading, speed, _next_wp) =
+            calculate_kinematics(0.0, 0.0, 0.0, 0.0, Some(wp), 0.1);
+
+        assert_eq!(speed, 0.0);
     }
 }
