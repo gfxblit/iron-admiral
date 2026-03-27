@@ -1,42 +1,10 @@
-use spacetimedb::{ReducerContext, Table};
+pub mod physics;
+pub mod reducers;
+pub mod tables;
+pub mod types;
 
-#[spacetimedb::table(accessor = person, public)]
-pub struct Person {
-    name: String,
-}
-
-#[spacetimedb::reducer(init)]
-pub fn init(_ctx: &ReducerContext) {
-    // Called when the module is initially published
-}
-
-#[spacetimedb::reducer(client_connected)]
-pub fn identity_connected(_ctx: &ReducerContext) {
-    // Called everytime a new client connects
-}
-
-#[spacetimedb::reducer(client_disconnected)]
-pub fn identity_disconnected(_ctx: &ReducerContext) {
-    // Called everytime a client disconnects
-}
-
-#[spacetimedb::reducer]
-pub fn add(ctx: &ReducerContext, name: String) {
-    ctx.db.person().insert(Person { name });
-}
-
-#[spacetimedb::reducer]
-pub fn say_hello(ctx: &ReducerContext) {
-    for person in ctx.db.person().iter() {
-        log::info!("Hello, {}!", person.name);
-    }
-    log::info!("Hello, World!");
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+pub use physics::*;
+pub use tables::{PhysicsTimer, Player, Ship};
+pub use types::Waypoint;
+// Reducers are usually accessed by name in SpacetimeDB, so we can export them individually if needed
+// or just leave them in their modules.
