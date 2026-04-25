@@ -1,6 +1,8 @@
-use crate::physics::{calculate_kinematics, ARRIVAL_DISTANCE, CIWS_RANGE, TICK_RATE_MS};
+use crate::physics::{
+    calculate_kinematics, point_to_segment_distance, ARRIVAL_DISTANCE, CIWS_RANGE, TICK_RATE_MS,
+};
 use crate::tables::{missile, physics_timer, ship, Missile, PhysicsTimer, Ship};
-use rand::Rng;
+use rand::{Rng, RngCore};
 use spacetimedb::{reducer, ReducerContext, ScheduleAt, Table};
 
 #[reducer]
@@ -53,25 +55,57 @@ pub fn physics_tick(ctx: &ReducerContext, _timer: PhysicsTimer) -> Result<(), St
 
         let dx = target_x - missile.x;
         let dy = target_y - missile.y;
-        let distance = (dx * dx + dy * dy).sqrt();
 
-        // 1. Check for CIWS Intercepts from ANY nearby ship (not just the target)
+        // 1. Calculate new position before checking impact
+        let heading = dy.atan2(dx);
+        let new_x = missile.x + missile.speed * heading.cos() * dt;
+        let new_y = missile.y + missile.speed * heading.sin() * dt;
+
+        // 2. Check for DCA (Distance of Closest Approach) on the trajectory segment
+        // This prevents missiles from "tunneling" through targets at high speed
+        let dca_distance = point_to_segment_distance(
+            target_x,
+            target_y,
+            missile.x,
+            missile.y,
+            new_x,
+            new_y,
+        );
+
         let mut intercepted = false;
+        if dca_distance <= ARRIVAL_DISTANCE {
+            // Missile path passes within arrival distance of target
+            missiles_to_delete.push(missile.id);
+            if let Some(target_ship_id) = missile.target_ship_id {
+                ships_to_delete.push(target_ship_id);
+            }
+            continue;
+        }
+
+        // 3. Check for CIWS intercepts - limit to ONE ship attempt per missile per tick
+        // Collect all ships in CIWS range (except missile owner)
+        let mut ships_in_range = Vec::new();
         for ship in ctx.db.ship().iter() {
-            // Only your own or allied ships would intercept? 
-            // Actually, in a simulation, any ship might try to defend itself or its fleet.
-            // For now, let's say ANY ship within CIWS range that is NOT the owner of the missile tries to intercept.
             if ship.owner_id != missile.owner_id {
                 let sdx = ship.x - missile.x;
                 let sdy = ship.y - missile.y;
                 let s_dist = (sdx * sdx + sdy * sdy).sqrt();
 
                 if s_dist <= CIWS_RANGE {
-                    let prob = ship.ship_class.ciws_probability();
-                    if ctx.rng().gen_bool(prob as f64) {
-                        intercepted = true;
-                        break;
-                    }
+                    ships_in_range.push(ship.id);
+                }
+            }
+        }
+
+        // Randomly select ONE ship from those in range and let it attempt interception
+        if !ships_in_range.is_empty() {
+            let selected_ship_idx = (ctx.rng().next_u32() as usize) % ships_in_range.len();
+            let selected_ship_id = ships_in_range[selected_ship_idx];
+
+            if let Some(selected_ship) = ctx.db.ship().id().find(selected_ship_id) {
+                let prob = selected_ship.ship_class.ciws_probability();
+                if ctx.rng().gen_bool(prob as f64) {
+                    intercepted = true;
                 }
             }
         }
@@ -81,21 +115,7 @@ pub fn physics_tick(ctx: &ReducerContext, _timer: PhysicsTimer) -> Result<(), St
             continue;
         }
 
-        // 2. Check for Impact
-        if distance <= ARRIVAL_DISTANCE {
-            missiles_to_delete.push(missile.id);
-            // If it was targeting a ship, that ship is destroyed
-            if let Some(target_ship_id) = missile.target_ship_id {
-                ships_to_delete.push(target_ship_id);
-            }
-            continue;
-        }
-
-        // 3. Move towards target
-        let heading = dy.atan2(dx);
-        let new_x = missile.x + missile.speed * heading.cos() * dt;
-        let new_y = missile.y + missile.speed * heading.sin() * dt;
-
+        // 4. Update missile position
         ctx.db.missile().id().update(Missile {
             x: new_x,
             y: new_y,

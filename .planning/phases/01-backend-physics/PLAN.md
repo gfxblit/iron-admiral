@@ -8,7 +8,10 @@ Implement the core game state, movement, and combat mechanics on the SpaceTimeDB
 - [x] Task 2: Implement Missile System (Table, Reducer, Physics)
 - [x] Task 3: Add Ship Classes and Radar/EMCON states
 - [x] Task 4: Implement Combat Logic (CIWS intercept probability)
-- [x] Task 5: Final Verification and Tests
+- [x] Task 5: Initial Verification
+- [ ] Task 6: Address Missile Tunneling (Review Feedback)
+- [ ] Task 7: Balance CIWS (Review Feedback)
+- [ ] Task 8: Final Verification and Tests
 
 ## Tasks
 
@@ -33,6 +36,17 @@ Implement the core game state, movement, and combat mechanics on the SpaceTimeDB
 - [x] Apply CIWS intercept probability using `ctx.rng()`.
 - [x] Handle missile impact and ship destruction.
 
-### Task 5: Final Verification
+### Task 5: Initial Verification
 - [x] Run `cargo test` and ensure all physics tests pass.
 - [x] Verify `spacetime build` works.
+
+### Task 6: Address Missile Tunneling
+- Implement a Distance of Closest Approach (DCA) check for missiles.
+- Instead of checking distance at $T_{end}$, check if the segment $(P_{start}, P_{end})$ passes within `ARRIVAL_DISTANCE` of the target.
+
+### Task 7: Balance CIWS
+- Limit CIWS attempts. A missile should only be "interceptable" by one ship per tick to prevent the "Fleet Wall" effect.
+
+### Task 8: Final Verification and Tests
+- Add a test case specifically for a missile that would "tunnel" through a ship at high speed.
+- Verify all physics tests pass.

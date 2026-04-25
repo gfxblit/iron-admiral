@@ -1,0 +1,13 @@
+{
+  "slot": "unknown",
+  "runId": "unknown",
+  "provider": "claude",
+  "activeSince": "2026-04-25T21:36:39.919Z",
+  "lastInteractionAt": "2026-04-25T21:39:50.980Z",
+  "cwd": "/Users/billyc/projects/iron-admiral/implement-backend-and-physics-issue3",
+  "lastEventType": "PreToolUse",
+  "eventCount": 36,
+  "lastCommand": "git add -A && git commit -m \"$(cat <<'EOF'\nfix(physics): implement DCA collision detection and limit CIWS to one attempt per tick\n\nTask 6: Address Missile Tunneling\n- Replace end-of-tick distance check with DCA (Distance of Closest Approach) \n  detection using point_to_segment_distance\n- Prevents missiles from \"phasing through\" targets when traveling at 3x ship speed\n- Missile path segment from start to end of tick is checked against ARRIVAL_DISTANCE\n\nTask 7: Balance CIWS (Fleet Wall Prevention)\n- Change CIWS logic from sequential all-ships-attempt to one random ship attempt\n- Collect all ships in CIWS_RANGE, randomly select one, let only that ship roll\n- Prevents \"Fleet Wall\" effect where multiple ships multiply intercept probability\n- Missile now faces single probability roll per tick instead of cascading rolls\n\nTask 8: Verification\n- Added test_dca_missile_tunneling_detection: verifies missile path detection works\n- Added test_dca_missile_misses: verifies missiles don't false-positive on near misses\n- All 14 physics tests pass with no warnings\n\nCo-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>\nEOF\n)\"",
+  "lastCommandAt": "2026-04-25T21:39:50.980Z",
+  "userPromptCount": 2
+}
