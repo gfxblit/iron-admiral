@@ -5,6 +5,8 @@ pub const MAX_TURN_RATE: f32 = 1.0; // Radians per second
 pub const MAX_ACCELERATION: f32 = 2.0; // Units per second squared
 pub const TICK_RATE_MS: u64 = 100; // 10Hz
 pub const ARRIVAL_DISTANCE: f32 = 1.0;
+pub const MISSILE_SPEED_MULTIPLIER: f32 = 3.0;
+pub const CIWS_RANGE: f32 = 2.0;
 
 pub fn calculate_kinematics(
     x: f32,
@@ -277,5 +279,16 @@ mod tests {
             calculate_kinematics(0.0, 0.0, 0.0, 0.0, Some(wp), 0.1);
 
         assert_eq!(speed, 0.0);
+    }
+
+    #[test]
+    fn test_ship_class_values() {
+        let ab = ShipClass::ArleighBurke;
+        assert_eq!(ab.max_speed(), 30.0);
+        assert_eq!(ab.ciws_probability(), 0.75);
+
+        let cvn = ShipClass::Carrier;
+        assert_eq!(cvn.max_speed(), 35.0);
+        assert_eq!(cvn.ciws_probability(), 0.60);
     }
 }
