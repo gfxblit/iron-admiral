@@ -26,13 +26,14 @@ const canvas = document.querySelector('canvas') as HTMLCanvasElement;
 
 async function initializeGame() {
   try {
+    updateStatus("Connecting...");
     // Connect to SpaceTimeDB
     await spacetimeManager.connect("ws://localhost:3000");
     updateStatus("Connected");
     console.log("[Main] Connected to SpaceTimeDB");
   } catch (error) {
     console.error("[Main] Connection error:", error);
-    updateStatus("Connection Failed");
+    updateStatus("Connection Failed - Check server is running on port 3000");
   }
 }
 

@@ -38,10 +38,10 @@ export class SpacetimeManager {
   /**
    * Connect to SpaceTimeDB instance
    *
-   * @param wsUrl - WebSocket URL (default: ws://localhost:8000)
+   * @param wsUrl - WebSocket URL (default: ws://localhost:3000)
    * @returns Promise<void>
    */
-  public async connect(wsUrl: string = 'ws://localhost:8000'): Promise<void> {
+  public async connect(wsUrl: string = 'ws://localhost:3000'): Promise<void> {
     if (this.isConnected || this.isConnecting) {
       console.warn('[SpacetimeManager] Already connected or connecting');
       return;
@@ -63,8 +63,9 @@ export class SpacetimeManager {
           console.log('[SpacetimeManager] Disconnected');
           this.handleDisconnect();
         })
-        .onConnectError(() => {
-          console.error('[SpacetimeManager] Connection error');
+        .onConnectError((error) => {
+          console.error('[SpacetimeManager] Connection error:', error);
+          this.handleConnectionError();
         })
         .build();
 
@@ -390,6 +391,15 @@ export class SpacetimeManager {
    */
   private handleDisconnect(): void {
     this.isConnected = false;
+    this.notifyListeners();
+  }
+
+  /**
+   * Handle connection error
+   */
+  private handleConnectionError(): void {
+    this.isConnected = false;
+    this.isConnecting = false;
     this.notifyListeners();
   }
 
