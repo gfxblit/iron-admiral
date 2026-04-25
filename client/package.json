@@ -10,6 +10,9 @@
     "lint": "eslint .",
     "test": "vitest run"
   },
+  "dependencies": {
+    "spacetimedb": "^2.0.2"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@vitest/coverage-v8": "^4.0.18",
