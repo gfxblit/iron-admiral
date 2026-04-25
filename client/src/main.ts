@@ -27,7 +27,7 @@ const canvas = document.querySelector('canvas') as HTMLCanvasElement;
 async function initializeGame() {
   try {
     // Connect to SpaceTimeDB
-    await spacetimeManager.connect("ws://localhost:8000");
+    await spacetimeManager.connect("ws://localhost:3000");
     updateStatus("Connected");
     console.log("[Main] Connected to SpaceTimeDB");
   } catch (error) {
