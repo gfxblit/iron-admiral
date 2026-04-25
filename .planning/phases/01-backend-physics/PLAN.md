@@ -9,9 +9,9 @@ Implement the core game state, movement, and combat mechanics on the SpaceTimeDB
 - [x] Task 3: Add Ship Classes and Radar/EMCON states
 - [x] Task 4: Implement Combat Logic (CIWS intercept probability)
 - [x] Task 5: Initial Verification
-- [ ] Task 6: Address Missile Tunneling (Review Feedback)
-- [ ] Task 7: Balance CIWS (Review Feedback)
-- [ ] Task 8: Final Verification and Tests
+- [x] Task 6: Address Missile Tunneling (Review Feedback)
+- [x] Task 7: Balance CIWS (Review Feedback)
+- [x] Task 8: Final Verification and Tests
 
 ## Tasks
 
