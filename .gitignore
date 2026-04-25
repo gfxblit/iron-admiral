@@ -31,3 +31,6 @@ dashboard/runtime/
 .env
 .env.*
 !.env.example
+
+# Planning
+.planning/
