@@ -10,9 +10,12 @@ Implement the core game state, movement, and combat mechanics on the SpaceTimeDB
 - [x] Balance CIWS (Fleet Wall prevention)
 
 ## Phase 2: End-to-End & Basic Rendering
-- [ ] Generate SDK bindings
-- [ ] Connect Frontend to Backend
-- [ ] Implement basic ship rendering
+- [x] Generate SDK bindings (2-01)
+- [x] Frontend Dependencies Configuration (2-02)
+- [x] SpaceTimeDB Connection Manager (2-03)
+- [x] Implement basic ship rendering - Canvas Renderer (2-04)
+- [ ] Input handlers and camera control (2-05)
+- [ ] Advanced rendering features (2-06)
 
 ## Phase 3: Advanced Mechanics & UI
 - [ ] Fog of War
