@@ -10,13 +10,14 @@ pub fn spawn_ship(ctx: &ReducerContext, x: f32, y: f32) -> Result<(), String> {
 
     ctx.db.ship().insert(Ship {
         id: 0,
-        owner: ctx.sender(),
+        owner_id: ctx.sender(),
         x,
         y,
         heading: 0.0,
         speed: 0.0,
         waypoint: None,
     });
+
     Ok(())
 }
 
@@ -30,7 +31,7 @@ pub fn set_waypoint(
 ) -> Result<(), String> {
     let ship = ctx.db.ship().id().find(ship_id).ok_or("Ship not found")?;
 
-    if ship.owner != ctx.sender() {
+    if ship.owner_id != ctx.sender() {
         return Err("Not your ship".to_string());
     }
 

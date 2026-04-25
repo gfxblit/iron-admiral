@@ -3,27 +3,30 @@ use crate::types::Waypoint;
 use spacetimedb::{table, Identity, ScheduleAt};
 
 #[table(accessor = player, public)]
+#[derive(Clone)]
 pub struct Player {
     #[primary_key]
     pub identity: Identity,
-    pub name: String,
+    pub nickname: Option<String>,
     pub online: bool,
 }
 
 #[table(accessor = ship, public)]
+#[derive(Clone)]
 pub struct Ship {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
-    pub owner: Identity,
+    pub owner_id: Identity,
     pub x: f32,
     pub y: f32,
-    pub heading: f32, // In radians
+    pub heading: f32,
     pub speed: f32,
     pub waypoint: Option<Waypoint>,
 }
 
 #[table(accessor = physics_timer, scheduled(physics_tick))]
+#[derive(Clone)]
 pub struct PhysicsTimer {
     #[primary_key]
     #[auto_inc]

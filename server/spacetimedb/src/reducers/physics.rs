@@ -3,13 +3,7 @@ use crate::tables::{physics_timer, ship, PhysicsTimer, Ship};
 use spacetimedb::{reducer, ReducerContext, ScheduleAt, Table};
 
 #[reducer]
-pub fn physics_tick(ctx: &ReducerContext, timer: PhysicsTimer) -> Result<(), String> {
-    // Delete the timer that triggered this tick
-    ctx.db
-        .physics_timer()
-        .scheduled_id()
-        .delete(timer.scheduled_id);
-
+pub fn physics_tick(ctx: &ReducerContext, _timer: PhysicsTimer) -> Result<(), String> {
     // Schedule next tick
     ctx.db.physics_timer().insert(PhysicsTimer {
         scheduled_id: 0,

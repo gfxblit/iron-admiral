@@ -13,7 +13,7 @@ pub fn register_player(ctx: &ReducerContext, name: String) -> Result<(), String>
 
     ctx.db.player().insert(Player {
         identity: ctx.sender(),
-        name,
+        nickname: Some(name),
         online: true,
     });
     Ok(())

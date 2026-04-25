@@ -9,3 +9,6 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 spacetimedb = { version = "2.0.2" }
 log = "0.4"
+
+[features]
+testing = []
