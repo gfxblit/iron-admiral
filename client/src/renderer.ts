@@ -30,6 +30,9 @@ export class Canvas2DRenderer {
   private centerY: number;
   private scale: number = 1; // pixels per game world unit
 
+  // Interaction state
+  private selectedShipId: bigint | null = null;
+
   // Color scheme
   private colors = {
     arleighBurkeShip: '#4A90E2', // Blue
@@ -215,6 +218,9 @@ export class Canvas2DRenderer {
     // Choose color based on ship class
     const fillColor = isCarrier ? this.colors.carrierShip : this.colors.arleighBurkeShip;
 
+    // Check if this is the selected ship
+    const isSelected = this.selectedShipId !== null && this.selectedShipId === ship.id;
+
     // Save context state
     this.ctx.save();
 
@@ -234,16 +240,21 @@ export class Canvas2DRenderer {
     this.ctx.closePath();
     this.ctx.fill();
 
-    // Draw outline
-    this.ctx.strokeStyle = 'white';
-    this.ctx.lineWidth = 1.5;
+    // Draw outline - highlighted if selected
+    if (isSelected) {
+      this.ctx.strokeStyle = this.colors.selected;
+      this.ctx.lineWidth = 3;
+    } else {
+      this.ctx.strokeStyle = 'white';
+      this.ctx.lineWidth = 1.5;
+    }
     this.ctx.stroke();
 
     // Restore context state
     this.ctx.restore();
 
     // Draw ship label (nickname if available, or ID)
-    this.drawShipLabel(canvasX, canvasY, ship);
+    this.drawShipLabel(canvasX, canvasY, ship, isSelected);
 
     // Draw waypoint and order line if ship has a waypoint
     if (ship.waypoint) {
@@ -255,7 +266,7 @@ export class Canvas2DRenderer {
   /**
    * Draw a ship's label (name/ID)
    */
-  private drawShipLabel(x: number, y: number, ship: Ship): void {
+  private drawShipLabel(x: number, y: number, ship: Ship, isSelected: boolean = false): void {
     this.ctx.fillStyle = 'white';
     this.ctx.font = '12px monospace';
     this.ctx.textAlign = 'center';
@@ -270,8 +281,12 @@ export class Canvas2DRenderer {
     const textHeight = 14;
     const padding = 2;
 
-    // Background rectangle
-    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    // Background rectangle - highlight if selected
+    if (isSelected) {
+      this.ctx.fillStyle = 'rgba(255, 107, 107, 0.8)';
+    } else {
+      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    }
     this.ctx.fillRect(
       x - textWidth / 2 - padding,
       y + 20 - padding,
@@ -280,7 +295,7 @@ export class Canvas2DRenderer {
     );
 
     // Text
-    this.ctx.fillStyle = 'white';
+    this.ctx.fillStyle = isSelected ? 'white' : 'white';
     this.ctx.fillText(label, x, y + 20);
   }
 
@@ -400,6 +415,27 @@ export class Canvas2DRenderer {
    */
   public setColor(element: keyof typeof this.colors, color: string): void {
     (this.colors as any)[element] = color;
+  }
+
+  /**
+   * Set the selected ship ID (for highlighting)
+   */
+  public setSelectedShip(shipId: bigint | null): void {
+    this.selectedShipId = shipId;
+  }
+
+  /**
+   * Get the selected ship ID
+   */
+  public getSelectedShip(): bigint | null {
+    return this.selectedShipId;
+  }
+
+  /**
+   * Get viewport center position
+   */
+  public getViewportCenter(): [number, number] {
+    return [this.centerX, this.centerY];
   }
 }
 

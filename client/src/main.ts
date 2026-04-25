@@ -1,6 +1,7 @@
 import "./style.css";
 import { initializeRenderer } from "./renderer";
 import { SpacetimeManager } from "./spacetime";
+import { initializeInteractions } from "./interactions";
 
 // Set up basic HTML structure
 document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
@@ -15,10 +16,13 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 `;
 
 // Initialize renderer and store reference for lifecycle management
-initializeRenderer("app");
+const renderer = initializeRenderer("app");
 
 // Initialize SpaceTimeDB connection
 const spacetimeManager = SpacetimeManager.getInstance();
+
+// Get canvas element for interaction setup
+const canvas = document.querySelector('canvas') as HTMLCanvasElement;
 
 async function initializeGame() {
   try {
@@ -55,6 +59,15 @@ function updateCounts(): void {
 // Subscribe to state updates to refresh counts
 spacetimeManager.subscribe(() => {
   updateCounts();
+});
+
+// Initialize interactions after renderer and manager are ready
+spacetimeManager.subscribe(() => {
+  if (spacetimeManager.isOnline() && canvas) {
+    // Initialize interactions system
+    initializeInteractions(canvas, renderer, spacetimeManager);
+    console.log('[Main] Interaction system initialized');
+  }
 });
 
 // Initialize game on load
