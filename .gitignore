@@ -34,3 +34,8 @@ dashboard/runtime/
 
 # Planning
 .planning/
+
+# Playwright E2E artifacts
+client/e2e-screenshots/
+client/playwright-report/
+client/test-results/
