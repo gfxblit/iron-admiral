@@ -169,7 +169,7 @@ jobs:
 
       - name: Start SpacetimeDB (local)
         run: |
-          spacetime start --local &
+          spacetime start --in-memory &
           echo "SPACETIME_PID=$!" >> $GITHUB_ENV
           # Wait for SpacetimeDB to listen on port 3000 (max 60s)
           for i in $(seq 1 60); do
