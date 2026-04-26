@@ -41,6 +41,25 @@ export class SpacetimeManager {
   }
 
   /**
+   * Reset singleton state — for use in test teardown.
+   *
+   * Clears the module-level instance and all connection flags so the next
+   * call to getInstance() returns a fresh, disconnected manager.
+   * This is required because the module-level singleton persists across
+   * page.goto() navigations within the same browser context.
+   */
+  public static reset(): void {
+    if (SpacetimeManager.instance) {
+      SpacetimeManager.instance.isConnected = false;
+      SpacetimeManager.instance.isConnecting = false;
+      SpacetimeManager.instance.connection = null;
+      SpacetimeManager.instance.localIdentity = null;
+      SpacetimeManager.instance.listeners = new Set();
+    }
+    SpacetimeManager.instance = null;
+  }
+
+  /**
    * Connect to SpaceTimeDB instance
    *
    * @param wsUrl - WebSocket URL (default: ws://localhost:3000)
