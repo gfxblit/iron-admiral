@@ -15,8 +15,8 @@ test('spawning a ship updates the UI count', async ({ page }) => {
   // Trigger ship spawn via the SpacetimeManager in the browser context
   // This simulates what would happen if a player or another agent triggered an action
   await page.evaluate(async () => {
-    // @ts-ignore - Accessing the singleton instance
-    const manager = window.spacetimeManager || (window as any).SpacetimeManager.getInstance();
+    // @ts-expect-error - Accessing the singleton instance exposed in main.ts
+    const manager = window.spacetimeManager;
     
     // Must register player first
     await manager.registerPlayer('TestPlayer');

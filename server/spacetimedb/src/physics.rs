@@ -1,6 +1,6 @@
+use crate::types::ShipClass;
 use crate::types::Waypoint;
 use std::f32::consts::PI;
-use crate::types::ShipClass;
 
 pub const MAX_TURN_RATE: f32 = 1.0; // Radians per second
 pub const MAX_ACCELERATION: f32 = 2.0; // Units per second squared
@@ -66,14 +66,7 @@ pub fn calculate_kinematics(
     (new_x, new_y, new_heading, new_speed, waypoint)
 }
 
-pub fn point_to_segment_distance(
-    px: f32,
-    py: f32,
-    x1: f32,
-    y1: f32,
-    x2: f32,
-    y2: f32,
-) -> f32 {
+pub fn point_to_segment_distance(px: f32, py: f32, x1: f32, y1: f32, x2: f32, y2: f32) -> f32 {
     let dx = x2 - x1;
     let dy = y2 - y1;
     let l2 = dx * dx + dy * dy;
@@ -335,11 +328,21 @@ mod tests {
         let target_x = 10.0;
         let target_y = 0.5;
 
-        let distance = point_to_segment_distance(target_x, target_y, missile_start_x, missile_start_y, missile_end_x, missile_end_y);
+        let distance = point_to_segment_distance(
+            target_x,
+            target_y,
+            missile_start_x,
+            missile_start_y,
+            missile_end_x,
+            missile_end_y,
+        );
 
         // Distance from point (10, 0.5) to line segment from (0, 0) to (20, 0) should be 0.5
         // which is less than ARRIVAL_DISTANCE (1.0), so missile should be detected as hitting
-        assert!(distance <= ARRIVAL_DISTANCE, "DCA should detect missile path passes within ARRIVAL_DISTANCE");
+        assert!(
+            distance <= ARRIVAL_DISTANCE,
+            "DCA should detect missile path passes within ARRIVAL_DISTANCE"
+        );
     }
 
     #[test]
@@ -353,9 +356,19 @@ mod tests {
         let target_x = 10.0;
         let target_y = 5.0;
 
-        let distance = point_to_segment_distance(target_x, target_y, missile_start_x, missile_start_y, missile_end_x, missile_end_y);
+        let distance = point_to_segment_distance(
+            target_x,
+            target_y,
+            missile_start_x,
+            missile_start_y,
+            missile_end_x,
+            missile_end_y,
+        );
 
         // Distance from (10, 5) to line segment should be 5.0, which exceeds ARRIVAL_DISTANCE
-        assert!(distance > ARRIVAL_DISTANCE, "DCA should not detect a miss as a hit");
+        assert!(
+            distance > ARRIVAL_DISTANCE,
+            "DCA should not detect a miss as a hit"
+        );
     }
 }

@@ -6,7 +6,7 @@
  * and exposes the state through accessor methods.
  */
 
-import { DbConnection } from './module_bindings';
+import { DbConnection, ErrorContext } from './module_bindings';
 import type { Player, Ship, Missile } from './module_bindings/types';
 
 /**
@@ -77,7 +77,7 @@ export class SpacetimeManager {
           console.log('[SpacetimeManager] Subscription applied');
           this.handleSubscriptionApplied();
         })
-        .onError((ctx: any) => {
+        .onError((ctx: ErrorContext) => {
           console.error('[SpacetimeManager] Subscription error:', ctx?.error);
         })
         .subscribe(['SELECT * FROM player', 'SELECT * FROM ship', 'SELECT * FROM missile']);
@@ -216,7 +216,8 @@ export class SpacetimeManager {
 
     try {
       for (const player of this.connection.db.player.iter()) {
-        const playerIdentityHex = (player.identity as any).toHexString?.() || String(player.identity);
+        const identity = player.identity as unknown as { toHexString?: () => string };
+        const playerIdentityHex = identity.toHexString?.() || String(player.identity);
         if (playerIdentityHex === identityHex) {
           return player;
         }
@@ -299,7 +300,8 @@ export class SpacetimeManager {
     }
 
     try {
-      (this.connection.reducers as any).fireMissile(shipId, targetX, targetY, targetShipId);
+      // @ts-expect-error - Reducers are dynamically bound by the SDK
+      this.connection.reducers.fireMissile(shipId, targetX, targetY, targetShipId);
     } catch (error) {
       console.error('[SpacetimeManager] Error firing missile:', error);
       throw error;
@@ -315,7 +317,8 @@ export class SpacetimeManager {
     }
 
     try {
-      (this.connection.reducers as any).registerPlayer({ name: nickname });
+      // @ts-expect-error - Reducers are dynamically bound by the SDK
+      this.connection.reducers.registerPlayer({ name: nickname });
     } catch (error) {
       console.error('[SpacetimeManager] Error registering player:', error);
       throw error;
@@ -336,7 +339,8 @@ export class SpacetimeManager {
     }
 
     try {
-      (this.connection.reducers as any).setWaypoint(shipId, x, y, targetSpeed);
+      // @ts-expect-error - Reducers are dynamically bound by the SDK
+      this.connection.reducers.setWaypoint(shipId, x, y, targetSpeed);
     } catch (error) {
       console.error('[SpacetimeManager] Error setting waypoint:', error);
       throw error;
@@ -352,7 +356,8 @@ export class SpacetimeManager {
     }
 
     try {
-      (this.connection.reducers as any).toggleRadar(shipId);
+      // @ts-expect-error - Reducers are dynamically bound by the SDK
+      this.connection.reducers.toggleRadar(shipId);
     } catch (error) {
       console.error('[SpacetimeManager] Error toggling radar:', error);
       throw error;
@@ -373,7 +378,8 @@ export class SpacetimeManager {
 
     try {
       const shipClassValue = { tag: shipClass };
-      (this.connection.reducers as any).spawnShip({
+      // @ts-expect-error - Reducers are dynamically bound by the SDK
+      this.connection.reducers.spawnShip({
         shipClass: shipClassValue,
         x,
         y,

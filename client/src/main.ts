@@ -20,7 +20,8 @@ const renderer = initializeRenderer("app");
 
 // Initialize SpaceTimeDB connection
 const spacetimeManager = SpacetimeManager.getInstance();
-(window as any).spacetimeManager = spacetimeManager;
+// @ts-expect-error - Expose to window for console debugging and E2E tests
+window.spacetimeManager = spacetimeManager;
 
 // Get canvas element for interaction setup
 const canvas = document.querySelector('canvas') as HTMLCanvasElement;

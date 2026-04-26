@@ -414,7 +414,7 @@ export class Canvas2DRenderer {
    * Set specific color for a rendering element
    */
   public setColor(element: keyof typeof this.colors, color: string): void {
-    (this.colors as any)[element] = color;
+    this.colors[element] = color;
   }
 
   /**

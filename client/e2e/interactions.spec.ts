@@ -9,8 +9,8 @@ test('setting a waypoint updates the ship target', async ({ page }) => {
 
   // Spawn a ship first
   await page.evaluate(async () => {
-    // @ts-ignore
-    const manager = window.spacetimeManager || (window as any).SpacetimeManager.getInstance();
+    // @ts-expect-error - Accessing the singleton instance exposed in main.ts
+    const manager = window.spacetimeManager;
     await manager.registerPlayer('InteractionTester');
     await new Promise(resolve => setTimeout(resolve, 500));
     await manager.spawnShip('ArleighBurke', 0, 0);

@@ -63,14 +63,8 @@ pub fn physics_tick(ctx: &ReducerContext, _timer: PhysicsTimer) -> Result<(), St
 
         // 2. Check for DCA (Distance of Closest Approach) on the trajectory segment
         // This prevents missiles from "tunneling" through targets at high speed
-        let dca_distance = point_to_segment_distance(
-            target_x,
-            target_y,
-            missile.x,
-            missile.y,
-            new_x,
-            new_y,
-        );
+        let dca_distance =
+            point_to_segment_distance(target_x, target_y, missile.x, missile.y, new_x, new_y);
 
         let mut intercepted = false;
         if dca_distance <= ARRIVAL_DISTANCE {

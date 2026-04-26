@@ -84,12 +84,14 @@ export class InteractionManager {
     // Try to find current player (simplified: use first player if available)
     if (players.length > 0) {
       const player = players[0];
-      const playerIdentityHex = (player.identity as any).toHexString?.() || String(player.identity);
+      const identity = player.identity as unknown as { toHexString?: () => string };
+      const playerIdentityHex = identity.toHexString?.() || String(player.identity);
 
       // Update player's ships
       this.playerShips.clear();
       for (const ship of ships) {
-        const shipOwnerHex = (ship.ownerId as any).toHexString?.() || String(ship.ownerId);
+        const ownerIdentity = ship.ownerId as unknown as { toHexString?: () => string };
+        const shipOwnerHex = ownerIdentity.toHexString?.() || String(ship.ownerId);
         if (shipOwnerHex === playerIdentityHex) {
           this.playerShips.add(ship.id);
         }

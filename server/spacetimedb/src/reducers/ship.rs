@@ -4,7 +4,12 @@ use crate::types::{ShipClass, Waypoint};
 use spacetimedb::{reducer, ReducerContext, Table};
 
 #[reducer]
-pub fn spawn_ship(ctx: &ReducerContext, ship_class: ShipClass, x: f32, y: f32) -> Result<(), String> {
+pub fn spawn_ship(
+    ctx: &ReducerContext,
+    ship_class: ShipClass,
+    x: f32,
+    y: f32,
+) -> Result<(), String> {
     if ctx.db.player().identity().find(ctx.sender()).is_none() {
         return Err("Player not registered".to_string());
     }
