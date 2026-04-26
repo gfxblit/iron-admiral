@@ -1,4 +1,3 @@
-use crate::types::ShipClass;
 use crate::types::Waypoint;
 use std::f32::consts::PI;
 
