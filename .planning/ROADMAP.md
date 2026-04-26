@@ -3,7 +3,7 @@
 ## Phase 1: Backend & Physics ✓ Complete
 ## Phase 2: End-to-End & Basic Rendering ✓ Complete
 
-## Phase 3: Closed-Loop E2E Testing (Current)
+## Phase 3: Closed-Loop E2E Testing ✓ Complete
 **Goal:** Persist Playwright work (3.1–3.4 already implemented locally), wire CI to run E2E tests on every PR, and codify `pnpm test:e2e` as the GSD verification gate so agents can autonomously confirm changes worked end-to-end.
 
 **Plans:** 2 plans
@@ -19,6 +19,6 @@ Existing milestone subtasks (work already partially completed locally — see ST
 - [x] 3.4: Visual/Canvas Verification Test
 - [x] 3.5: CI Integration (GitHub Actions update) — covered by 03-02-PLAN.md
 
-## Phase 4: Advanced Mechanics & UI
+## Phase 4: Advanced Mechanics & UI (Current)
 - [ ] Fog of War
 - [ ] Advanced UI Overlays
