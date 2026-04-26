@@ -171,8 +171,9 @@ export class InteractionManager {
   /**
    * Register the player.
    * Sets isRegistering to prevent duplicate calls until the server confirms registration.
+   * Async so that async reducer rejections are caught and isRegistering is reset on failure.
    */
-  private registerPlayer = (): void => {
+  private registerPlayer = async (): Promise<void> => {
     try {
       // Generate a nickname for the player
       const nickname = `Player_${Math.floor(Math.random() * 10000)}`;
@@ -180,8 +181,8 @@ export class InteractionManager {
       // Set guard before calling the reducer to block rapid duplicate clicks
       this.isRegistering = true;
 
-      // Call registerPlayer reducer
-      this.spacetimeManager.registerPlayer(nickname);
+      // Await the async reducer call so rejections propagate to the catch block
+      await this.spacetimeManager.registerPlayer(nickname);
 
       this.showStatus('Registering player...');
     } catch (error) {
