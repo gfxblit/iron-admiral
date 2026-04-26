@@ -130,8 +130,8 @@ jobs:
       
       - name: Install SpacetimeDB CLI
         run: |
-          curl -sL https://install.spacetimedb.com | sh
-          echo "$HOME/.spacetimedb" >> $GITHUB_PATH
+          curl -sL https://install.spacetimedb.com | sh -s -- --yes
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
         
       - name: Publish to SpacetimeDB
         working-directory: ./server
@@ -164,8 +164,8 @@ jobs:
 
       - name: Install SpacetimeDB CLI
         run: |
-          curl -sL https://install.spacetimedb.com | sh
-          echo "$HOME/.spacetimedb" >> $GITHUB_PATH
+          curl -sL https://install.spacetimedb.com | sh -s -- --yes
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Start SpacetimeDB (local)
         run: |
