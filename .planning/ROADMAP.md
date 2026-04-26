@@ -11,7 +11,7 @@
 Plans:
 - [x] 03-01-PLAN.md — Track Playwright source files, ignore artifacts, write CLAUDE.md verification requirement (D-01, D-04, D-05, D-06)
 - [x] 03-02-PLAN.md — Add `e2e` job to GitHub Actions (PR-only trigger, SpaceTimeDB local orchestration, Playwright report artifact on failure) (D-02, D-03, D-07)
-- [ ] 03-03-PLAN.md — Stabilize interaction loop and fix registration hang (Fix listener explosion and global player check)
+- [x] 03-03-PLAN.md — Stabilize interaction loop and fix registration hang (Fix listener explosion and global player check)
 
 Existing milestone subtasks (work already partially completed locally — see STATE.md):
 - [x] 3.1: Playwright Installation & Base Config
