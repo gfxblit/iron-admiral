@@ -356,7 +356,7 @@ export class SpacetimeManager {
 
     try {
       // @ts-expect-error - Reducers are dynamically bound by the SDK
-      this.connection.reducers.setWaypoint(shipId, x, y, targetSpeed);
+      this.connection.reducers.setWaypoint({ shipId, targetX: x, targetY: y, targetSpeed });
     } catch (error) {
       console.error('[SpacetimeManager] Error setting waypoint:', error);
       throw error;
