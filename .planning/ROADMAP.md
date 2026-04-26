@@ -19,6 +19,13 @@ Existing milestone subtasks (work already partially completed locally — see ST
 - [x] 3.4: Visual/Canvas Verification Test
 - [x] 3.5: CI Integration (GitHub Actions update) — covered by 03-02-PLAN.md
 
-## Phase 4: Advanced Mechanics & UI (Current)
-- [ ] Fog of War
+## Phase 4: UI Controls for Existing Features (Current)
+**Goal:** Surface existing backend features (radar toggle, missile firing) through keyboard shortcuts and canvas visuals so the game is fully playtestable without browser devtools.
+
+- [ ] Keyboard shortcuts: R = toggle radar on selected ship, F = enter fire mode
+- [ ] Fire mode: click enemy ship to fire missile from selected ship
+- [ ] Radar circle overlay on canvas when radar_on = true
+
+## Phase 5: Advanced Mechanics & UI
+- [ ] Fog of War (visibility filtering by radar range)
 - [ ] Advanced UI Overlays
