@@ -83,6 +83,8 @@ export class SpacetimeManager {
         .onConnect((_conn: DbConnection, identity: Identity) => {
           console.log('[SpacetimeManager] Connection established, identity:', identity.toHexString());
           this.localIdentity = identity;
+          this.isConnected = true;
+          this.isConnecting = false;
           this.handleConnectionEstablished();
         })
         .onDisconnect(() => {
@@ -138,10 +140,7 @@ export class SpacetimeManager {
         this.notifyListeners();
       });
 
-      this.isConnected = true;
-      this.isConnecting = false;
       console.log('[SpacetimeManager] Connected and subscribed to game tables');
-      this.notifyListeners();
     } catch (error) {
       this.isConnecting = false;
       console.error('[SpacetimeManager] Connection failed:', error);
