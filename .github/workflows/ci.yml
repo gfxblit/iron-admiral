@@ -135,7 +135,7 @@ jobs:
         
       - name: Publish to SpacetimeDB
         working-directory: ./server
-        run: spacetime publish iron-admiral
+        run: spacetime publish iron-admiral --yes
         env:
           SPACETIMEDB_TOKEN: ${{ secrets.SPACETIMEDB_TOKEN }}
 
@@ -182,7 +182,7 @@ jobs:
 
       - name: Publish iron-admiral module (local)
         working-directory: ./server
-        run: spacetime publish iron-admiral --local
+        run: spacetime publish iron-admiral -s http://127.0.0.1:3000 --yes
 
       - name: Run Playwright E2E tests
         working-directory: ./client
