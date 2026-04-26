@@ -28,6 +28,9 @@ export class InteractionManager {
   private selectedShipId: bigint | null = null;
   private playerShips: Set<bigint> = new Set();
 
+  // Guard to prevent duplicate registration calls from rapid clicks
+  private isRegistering: boolean = false;
+
   // UI feedback elements
   private statusElement: HTMLElement | null = null;
 
@@ -75,26 +78,34 @@ export class InteractionManager {
   }
 
   /**
-   * Update player state from SpacetimeManager
+   * Update player state from SpacetimeManager.
+   * Uses the local user's identity to correctly identify the current player's ships
+   * even when multiple players are present in the session.
    */
   private updatePlayerState = (): void => {
-    const players = this.spacetimeManager.getPlayers();
+    const localIdentityHex = this.spacetimeManager.getUserIdentity();
     const ships = this.spacetimeManager.getShips();
 
-    // Try to find current player (simplified: use first player if available)
-    if (players.length > 0) {
-      const player = players[0];
-      const identity = player.identity as unknown as { toHexString?: () => string };
-      const playerIdentityHex = identity.toHexString?.() || String(player.identity);
+    if (!localIdentityHex) {
+      return;
+    }
 
-      // Update player's ships
-      this.playerShips.clear();
-      for (const ship of ships) {
-        const ownerIdentity = ship.ownerId as unknown as { toHexString?: () => string };
-        const shipOwnerHex = ownerIdentity.toHexString?.() || String(ship.ownerId);
-        if (shipOwnerHex === playerIdentityHex) {
-          this.playerShips.add(ship.id);
-        }
+    // Clear and rebuild the local player's ship set using the authoritative local identity
+    this.playerShips.clear();
+    for (const ship of ships) {
+      const ownerIdentity = ship.ownerId as unknown as { toHexString?: () => string };
+      const shipOwnerHex = ownerIdentity.toHexString?.() || String(ship.ownerId);
+      if (shipOwnerHex === localIdentityHex) {
+        this.playerShips.add(ship.id);
+      }
+    }
+
+    // Clear the isRegistering guard once the local player appears in the table
+    if (this.isRegistering) {
+      const localPlayer = this.spacetimeManager.getPlayer(localIdentityHex);
+      if (localPlayer) {
+        this.isRegistering = false;
+        console.log('[InteractionManager] Local Player Registered');
       }
     }
   };
@@ -107,13 +118,23 @@ export class InteractionManager {
     const canvasX = event.clientX - rect.left;
     const canvasY = event.clientY - rect.top;
 
-    // Check if player is registered
-    const players = this.spacetimeManager.getPlayers();
-    if (players.length === 0) {
-      // No player registered - register one
-      this.registerPlayer();
+    // Use the local user's identity to determine registration status.
+    // Checking players.length would incorrectly treat other players' presence
+    // as meaning the local user is already registered.
+    const localIdentityHex = this.spacetimeManager.getUserIdentity();
+    const localPlayer = localIdentityHex
+      ? this.spacetimeManager.getPlayer(localIdentityHex)
+      : undefined;
+
+    if (!localPlayer) {
+      // Local user is not yet registered — register once, guard against rapid clicks
+      if (!this.isRegistering) {
+        this.registerPlayer();
+      } else {
+        this.showStatus('Registering... please wait');
+      }
     } else {
-      // Player is registered - spawn a ship or select one
+      // Local user is registered — spawn a ship or select one
       this.handleSpawnOrSelect(canvasX, canvasY);
     }
   };
@@ -148,12 +169,16 @@ export class InteractionManager {
   };
 
   /**
-   * Register the player
+   * Register the player.
+   * Sets isRegistering to prevent duplicate calls until the server confirms registration.
    */
   private registerPlayer = (): void => {
     try {
       // Generate a nickname for the player
       const nickname = `Player_${Math.floor(Math.random() * 10000)}`;
+
+      // Set guard before calling the reducer to block rapid duplicate clicks
+      this.isRegistering = true;
 
       // Call registerPlayer reducer
       this.spacetimeManager.registerPlayer(nickname);
@@ -161,6 +186,7 @@ export class InteractionManager {
       this.showStatus('Registering player...');
     } catch (error) {
       console.error('[InteractionManager] Error registering player:', error);
+      this.isRegistering = false;
       this.showStatus('Failed to register player');
     }
   };

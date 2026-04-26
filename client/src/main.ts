@@ -33,6 +33,14 @@ async function initializeGame() {
     await spacetimeManager.connect("ws://localhost:3000");
     updateStatus("Connected");
     console.log("[Main] Connected to SpaceTimeDB");
+
+    // Initialize the interaction system exactly once, after the connection is live.
+    // Placing this inside spacetimeManager.subscribe() would re-initialize on every
+    // server tick (10Hz), causing listener explosion.
+    if (canvas) {
+      initializeInteractions(canvas, renderer, spacetimeManager);
+      console.log('[Main] Interaction system initialized');
+    }
   } catch (error) {
     console.error("[Main] Connection error:", error);
     updateStatus("Connection Failed - Check server is running on port 3000");
@@ -62,15 +70,6 @@ function updateCounts(): void {
 // Subscribe to state updates to refresh counts
 spacetimeManager.subscribe(() => {
   updateCounts();
-});
-
-// Initialize interactions after renderer and manager are ready
-spacetimeManager.subscribe(() => {
-  if (spacetimeManager.isOnline() && canvas) {
-    // Initialize interactions system
-    initializeInteractions(canvas, renderer, spacetimeManager);
-    console.log('[Main] Interaction system initialized');
-  }
 });
 
 // Initialize game on load
