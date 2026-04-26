@@ -66,9 +66,12 @@ export class SpacetimeManager {
    * @returns Promise<void>
    */
   public async connect(wsUrl: string = 'ws://localhost:3000'): Promise<void> {
-    if (this.isConnected || this.isConnecting) {
-      console.warn('[SpacetimeManager] Already connected or connecting');
+    if (this.isConnected) {
+      // Idempotent — already connected, nothing to do
       return;
+    }
+    if (this.isConnecting) {
+      throw new Error('[SpacetimeManager] Connection already in progress');
     }
 
     this.isConnecting = true;
