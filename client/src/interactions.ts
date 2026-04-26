@@ -20,6 +20,9 @@ import type { Ship } from './module_bindings/types';
  * - Visual feedback
  */
 export class InteractionManager {
+  /** World radius in units — must match the server's WORLD_RADIUS constant in lib.rs */
+  private static readonly WORLD_RADIUS = 5000;
+
   private canvas: HTMLCanvasElement;
   private spacetimeManager: SpacetimeManager;
   private renderer: Canvas2DRenderer;
@@ -309,10 +312,8 @@ export class InteractionManager {
    * Validate waypoint is within bounds
    */
   private isWaypointValid = (worldX: number, worldY: number): boolean => {
-    // Define reasonable game bounds
-    const maxDistance = 5000; // World units from origin
     const distanceFromOrigin = Math.sqrt(worldX * worldX + worldY * worldY);
-    return distanceFromOrigin <= maxDistance;
+    return distanceFromOrigin <= InteractionManager.WORLD_RADIUS;
   };
 
   /**
