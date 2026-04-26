@@ -6,7 +6,6 @@ describe("main.ts", () => {
     document.body.innerHTML = '<div id="app"></div>';
     
     // Mock HTMLCanvasElement.prototype.getContext
-    // @ts-expect-error - simple mock for testing
     HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue({
       beginPath: vi.fn(),
       moveTo: vi.fn(),

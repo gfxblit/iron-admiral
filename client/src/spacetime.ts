@@ -6,7 +6,8 @@
  * and exposes the state through accessor methods.
  */
 
-import { DbConnection, ErrorContext } from './module_bindings';
+import { DbConnection } from './module_bindings';
+import type { ErrorContext } from './module_bindings';
 import type { Player, Ship, Missile } from './module_bindings/types';
 
 /**
@@ -78,7 +79,7 @@ export class SpacetimeManager {
           this.handleSubscriptionApplied();
         })
         .onError((ctx: ErrorContext) => {
-          console.error('[SpacetimeManager] Subscription error:', ctx?.error);
+          console.error('[SpacetimeManager] Subscription error:', ctx?.event);
         })
         .subscribe(['SELECT * FROM player', 'SELECT * FROM ship', 'SELECT * FROM missile']);
 
@@ -317,7 +318,6 @@ export class SpacetimeManager {
     }
 
     try {
-      // @ts-expect-error - Reducers are dynamically bound by the SDK
       this.connection.reducers.registerPlayer({ name: nickname });
     } catch (error) {
       console.error('[SpacetimeManager] Error registering player:', error);
@@ -378,7 +378,6 @@ export class SpacetimeManager {
 
     try {
       const shipClassValue = { tag: shipClass };
-      // @ts-expect-error - Reducers are dynamically bound by the SDK
       this.connection.reducers.spawnShip({
         shipClass: shipClassValue,
         x,

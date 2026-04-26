@@ -91,6 +91,7 @@ pub fn point_to_segment_distance(px: f32, py: f32, x1: f32, y1: f32, x2: f32, y2
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::ShipClass;
 
     #[test]
     fn test_kinematics_no_waypoint() {
