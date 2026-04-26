@@ -1,6 +1,7 @@
 # Project Instructions
 
 These instructions apply to all agents working in this repository.
+<!-- ci-verify: e2e gate check -->
 
 ## Verification Requirement (per Phase 3 D-04)
 
