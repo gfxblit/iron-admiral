@@ -25,8 +25,17 @@ Cargo.lock
 # SpaceTimeDB local config
 *.local.json
 .spacetime/
+dashboard/runtime/
 
 # Environment
 .env
 .env.*
 !.env.example
+
+# Planning
+.planning/
+
+# Playwright E2E artifacts
+client/e2e-screenshots/
+client/playwright-report/
+client/test-results/

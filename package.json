@@ -2,8 +2,12 @@
   "name": "iron-admiral-root",
   "private": true,
   "scripts": {
-    "lint": "cd client && npm run lint",
-    "test": "cd client && npm run test -- --coverage",
-    "build": "cd client && npm run build"
+    "lint": "cd client && pnpm run lint",
+    "test": "npm run test-client && npm run test-server",
+    "test-client": "cd client && pnpm run test -- --coverage",
+    "test-server": "cd server/spacetimedb && cargo test",
+    "build": "npm run build-client && npm run build-server",
+    "build-client": "cd client && pnpm run build",
+    "build-server": "cd server/spacetimedb && spacetime build"
   }
 }

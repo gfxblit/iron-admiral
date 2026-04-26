@@ -1,0 +1,624 @@
+You are an elite software architect and security auditor.
+Review the following implementation of 'Phase 1: Backend & Physics' for the project 'Iron Admiral'.
+
+### Goal
+Implement authoritative 2D vector physics, missile tracking, and CIWS (Point Defense) logic in a SpaceTimeDB (Rust) environment.
+
+### Phase Plan
+# Phase 1: Backend & Physics
+
+## Goal
+Implement the core game state, movement, and combat mechanics on the SpaceTimeDB backend.
+
+## Status
+- [x] Task 1: Commit current refactoring and cleanup
+- [x] Task 2: Implement Missile System (Table, Reducer, Physics)
+- [x] Task 3: Add Ship Classes and Radar/EMCON states
+- [x] Task 4: Implement Combat Logic (CIWS intercept probability)
+- [x] Task 5: Final Verification and Tests
+
+## Tasks
+
+### Task 1: Commit current refactoring and cleanup
+- [x] Review and commit the unstaged changes in `server/spacetimedb/`.
+- [x] Clean up untracked files (`test_tmux.log`).
+
+### Task 2: Implement Missile System
+- [x] Define `Missile` struct in `tables.rs`.
+- [x] Add `fire_missile` reducer in `reducers/ship.rs`.
+- [x] Update `physics_tick` in `reducers/physics.rs` to move missiles (3x ship speed).
+- [x] Update `types.rs` for `Waypoint` and other types.
+
+### Task 3: Add Ship Classes and Radar/EMCON
+- [x] Update `Ship` table in `tables.rs` with `ship_class` and `radar_on`.
+- [x] Implement `toggle_radar` reducer.
+- [x] Update `spawn_ship` to accept `ship_class`.
+- [x] Implement `ShipClass` with max speed and CIWS probability.
+
+### Task 4: Implement Combat Logic
+- [x] In `physics_tick`, check for missiles within range of ships.
+- [x] Apply CIWS intercept probability using `ctx.rng()`.
+- [x] Handle missile impact and ship destruction.
+
+### Task 5: Final Verification
+- [x] Run `cargo test` and ensure all physics tests pass.
+- [x] Verify `spacetime build` works.
+
+### Implementation
+use crate::types::Waypoint;
+use std::f32::consts::PI;
+
+pub const MAX_TURN_RATE: f32 = 1.0; // Radians per second
+pub const MAX_ACCELERATION: f32 = 2.0; // Units per second squared
+pub const TICK_RATE_MS: u64 = 100; // 10Hz
+pub const ARRIVAL_DISTANCE: f32 = 1.0;
+pub const MISSILE_SPEED_MULTIPLIER: f32 = 3.0;
+pub const CIWS_RANGE: f32 = 2.0;
+
+pub fn calculate_kinematics(
+    x: f32,
+    y: f32,
+    heading: f32,
+    speed: f32,
+    waypoint: Option<Waypoint>,
+    dt: f32,
+) -> (f32, f32, f32, f32, Option<Waypoint>) {
+    let mut new_heading = heading;
+    let mut new_speed = speed;
+
+    if let Some(wp) = &waypoint {
+        let dx = wp.x - x;
+        let dy = wp.y - y;
+        let distance = (dx * dx + dy * dy).sqrt();
+
+        // Arrival tolerance
+        if distance <= ARRIVAL_DISTANCE {
+            return (wp.x, wp.y, heading, wp.target_speed, None);
+        }
+
+        let target_heading = dy.atan2(dx);
+
+        let diff = (target_heading - heading + PI).rem_euclid(2.0 * PI) - PI;
+
+        let max_turn = MAX_TURN_RATE * dt;
+        if diff > max_turn {
+            new_heading = heading + max_turn;
+        } else if diff < -max_turn {
+            new_heading = heading - max_turn;
+        } else {
+            new_heading = target_heading;
+        }
+
+        new_heading = (new_heading + PI).rem_euclid(2.0 * PI) - PI;
+
+        let speed_diff = wp.target_speed - speed;
+        let max_accel = MAX_ACCELERATION * dt;
+        if speed_diff > max_accel {
+            new_speed += max_accel;
+        } else if speed_diff < -max_accel {
+            new_speed -= max_accel;
+        } else {
+            new_speed = wp.target_speed;
+        }
+    }
+
+    if new_speed < 0.0 {
+        new_speed = 0.0;
+    }
+
+    let new_x = x + new_speed * new_heading.cos() * dt;
+    let new_y = y + new_speed * new_heading.sin() * dt;
+
+    (new_x, new_y, new_heading, new_speed, waypoint)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_kinematics_no_waypoint() {
+        let (x, y, heading, speed, wp) = calculate_kinematics(0.0, 0.0, 0.0, 10.0, None, 0.1);
+
+        assert_eq!(x, 1.0); // 10.0 speed * 0.1 dt
+        assert_eq!(y, 0.0);
+        assert_eq!(heading, 0.0);
+        assert_eq!(speed, 10.0);
+        assert_eq!(wp, None);
+    }
+
+    #[test]
+    fn test_kinematics_turn_towards_waypoint() {
+        let wp = Waypoint {
+            x: 0.0,
+            y: 10.0,
+            target_speed: 10.0,
+        };
+        // Initial heading is 0 (facing right), waypoint is directly up (PI/2)
+        // With MAX_TURN_RATE = 1.0, dt = 0.1, we can turn 0.1 radians
+        let (_x, _y, heading, _speed, _next_wp) =
+            calculate_kinematics(0.0, 0.0, 0.0, 10.0, Some(wp), 0.1);
+
+        assert!(heading > 0.0 && heading <= 0.10001);
+    }
+
+    #[test]
+    fn test_kinematics_arrive_at_waypoint_preserves_target_speed() {
+        let wp = Waypoint {
+            x: 0.5,
+            y: 0.0,
+            target_speed: 5.0,
+        };
+        // We are within ARRIVAL_DISTANCE of the waypoint
+        let (x, y, _heading, speed, next_wp) =
+            calculate_kinematics(0.0, 0.0, 0.0, 10.0, Some(wp), 0.1);
+
+        assert_eq!(x, 0.5);
+        assert_eq!(y, 0.0);
+        assert_eq!(
+            speed, 5.0,
+            "Speed should be updated to waypoint target speed upon arrival"
+        );
+        assert_eq!(next_wp, None);
+    }
+
+    #[test]
+    fn test_kinematics_arrive_at_waypoint() {
+        let wp = Waypoint {
+            x: 0.5,
+            y: 0.0,
+            target_speed: 0.0,
+        };
+        // We are within 1.0 of the waypoint
+        let (x, y, _heading, speed, next_wp) =
+            calculate_kinematics(0.0, 0.0, 0.0, 10.0, Some(wp), 0.1);
+
+        assert_eq!(x, 0.5);
+        assert_eq!(y, 0.0);
+        assert_eq!(speed, 0.0);
+        assert_eq!(next_wp, None);
+    }
+
+    #[test]
+    fn test_kinematics_acceleration() {
+        let wp = Waypoint {
+            x: 10.0,
+            y: 0.0,
+            target_speed: 10.0,
+        };
+        // Initial speed is 0.0, target is 10.0. With MAX_ACCELERATION = 2.0 and dt = 0.1, we should accelerate by 0.2
+        let (_x, _y, _heading, speed, _next_wp) =
+            calculate_kinematics(0.0, 0.0, 0.0, 0.0, Some(wp), 0.1);
+
+        assert_eq!(speed, 0.2);
+    }
+
+    #[test]
+    fn test_simulation_until_arrival() {
+        let wp = Waypoint {
+            x: 10.0,
+            y: 10.0,
+            target_speed: 10.0,
+        };
+        let mut x = 0.0;
+        let mut y = 0.0;
+        let mut heading = 0.0;
+        let mut speed = 10.0;
+        let mut current_wp = Some(wp);
+        let dt = 0.1;
+
+        let mut ticks = 0;
+        while current_wp.is_some() && ticks < 200 {
+            let (new_x, new_y, new_heading, new_speed, new_wp) =
+                calculate_kinematics(x, y, heading, speed, current_wp.clone(), dt);
+            x = new_x;
+            y = new_y;
+            heading = new_heading;
+            speed = new_speed;
+            current_wp = new_wp;
+            ticks += 1;
+        }
+
+        assert!(current_wp.is_none());
+        assert!((x - 10.0).abs() <= 1.0);
+        assert!((y - 10.0).abs() <= 1.0);
+        assert!(ticks < 200, "Should arrive before 200 ticks");
+    }
+
+    #[test]
+    fn test_stop_after_arrival() {
+        let wp = Waypoint {
+            x: 5.0,
+            y: 0.0,
+            target_speed: 0.0,
+        };
+        let mut x = 0.0;
+        let mut y = 0.0;
+        let mut heading = 0.0;
+        let mut speed = 10.0;
+        let mut current_wp = Some(wp);
+        let dt = 0.1;
+
+        for _ in 0..100 {
+            let (new_x, new_y, new_heading, new_speed, new_wp) =
+                calculate_kinematics(x, y, heading, speed, current_wp.clone(), dt);
+            x = new_x;
+            y = new_y;
+            heading = new_heading;
+            speed = new_speed;
+            current_wp = new_wp;
+        }
+
+        assert!(current_wp.is_none());
+        assert_eq!(speed, 0.0, "Speed should be 0 after stopping at waypoint");
+        assert!((x - 5.0).abs() < 1.1);
+    }
+
+    #[test]
+    fn test_kinematics_turn_limit() {
+        let wp = Waypoint {
+            x: -10.0,
+            y: 0.0,
+            target_speed: 10.0,
+        };
+        let (_x, _y, heading, _speed, _next_wp) =
+            calculate_kinematics(0.0, 0.0, -PI + 0.1, 10.0, Some(wp), 0.1);
+
+        assert!((heading - (-PI)).abs() < 0.0001 || (heading - PI).abs() < 0.0001);
+    }
+
+    #[test]
+    fn test_kinematics_turn_and_accelerate() {
+        let wp = Waypoint {
+            x: 10.0,
+            y: 10.0,
+            target_speed: 10.0,
+        };
+        let (x, y, heading, speed, _next_wp) =
+            calculate_kinematics(0.0, 0.0, 0.0, 0.0, Some(wp), 0.1);
+
+        assert!(heading > 0.0 && heading <= 0.10001);
+        assert_eq!(speed, 0.2);
+        assert!(x > 0.0);
+        assert!(y > 0.0);
+    }
+
+    #[test]
+    fn test_kinematics_overshoot_and_circle_back() {
+        let wp = Waypoint {
+            x: -1.0,
+            y: 0.0,
+            target_speed: 10.0,
+        };
+        let mut x = 0.0;
+        let mut y = 0.0;
+        let mut heading = 0.0;
+        let mut speed = 10.0;
+        let mut current_wp = Some(wp);
+        let dt = 0.1;
+
+        let mut ticks = 0;
+        while current_wp.is_some() && ticks < 500 {
+            let (new_x, new_y, new_heading, new_speed, new_wp) =
+                calculate_kinematics(x, y, heading, speed, current_wp.clone(), dt);
+            x = new_x;
+            y = new_y;
+            heading = new_heading;
+            speed = new_speed;
+            current_wp = new_wp;
+            ticks += 1;
+        }
+
+        assert!(current_wp.is_none());
+        assert!((x - (-1.0)).abs() <= 1.0);
+        assert!((y - 0.0).abs() <= 1.0);
+    }
+
+    #[test]
+    fn test_negative_target_speed() {
+        let wp = Waypoint {
+            x: 10.0,
+            y: 0.0,
+            target_speed: -5.0,
+        };
+        // Initial speed 0, target speed -5.0. Should NOT become negative.
+        let (_x, _y, _heading, speed, _next_wp) =
+            calculate_kinematics(0.0, 0.0, 0.0, 0.0, Some(wp), 0.1);
+
+        assert_eq!(speed, 0.0);
+    }
+
+    #[test]
+    fn test_ship_class_values() {
+        let ab = ShipClass::ArleighBurke;
+        assert_eq!(ab.max_speed(), 30.0);
+        assert_eq!(ab.ciws_probability(), 0.75);
+
+        let cvn = ShipClass::Carrier;
+        assert_eq!(cvn.max_speed(), 35.0);
+        assert_eq!(cvn.ciws_probability(), 0.60);
+    }
+}
+use crate::reducers::physics::physics_tick;
+use crate::types::{ShipClass, Waypoint};
+use spacetimedb::{table, Identity, ScheduleAt};
+
+#[table(accessor = player, public)]
+#[derive(Clone)]
+pub struct Player {
+    #[primary_key]
+    pub identity: Identity,
+    pub nickname: Option<String>,
+    pub online: bool,
+}
+
+#[table(accessor = ship, public)]
+#[derive(Clone)]
+pub struct Ship {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub owner_id: Identity,
+    pub ship_class: ShipClass,
+    pub x: f32,
+    pub y: f32,
+    pub heading: f32,
+    pub speed: f32,
+    pub radar_on: bool,
+    pub waypoint: Option<Waypoint>,
+}
+
+#[table(accessor = physics_timer, scheduled(physics_tick))]
+#[derive(Clone)]
+pub struct PhysicsTimer {
+    #[primary_key]
+    #[auto_inc]
+    pub scheduled_id: u64,
+    pub scheduled_at: ScheduleAt,
+}
+
+#[table(accessor = missile, public)]
+#[derive(Clone)]
+pub struct Missile {
+    #[primary_key]
+    #[auto_inc]
+    pub id: u64,
+    pub owner_id: Identity,
+    pub x: f32,
+    pub y: f32,
+    pub heading: f32,
+    pub speed: f32,
+    pub target_x: f32,
+    pub target_y: f32,
+    pub target_ship_id: Option<u64>,
+}
+use crate::physics::{calculate_kinematics, ARRIVAL_DISTANCE, CIWS_RANGE, TICK_RATE_MS};
+use crate::tables::{missile, physics_timer, ship, Missile, PhysicsTimer, Ship};
+use rand::Rng;
+use spacetimedb::{reducer, ReducerContext, ScheduleAt, Table};
+
+#[reducer]
+pub fn physics_tick(ctx: &ReducerContext, _timer: PhysicsTimer) -> Result<(), String> {
+    // Schedule next tick
+    ctx.db.physics_timer().insert(PhysicsTimer {
+        scheduled_id: 0,
+        scheduled_at: ScheduleAt::Time(
+            ctx.timestamp + std::time::Duration::from_millis(TICK_RATE_MS),
+        ),
+    });
+
+    let dt = TICK_RATE_MS as f32 / 1000.0;
+
+    for ship in ctx.db.ship().iter() {
+        let (new_x, new_y, new_heading, new_speed, new_waypoint) = calculate_kinematics(
+            ship.x,
+            ship.y,
+            ship.heading,
+            ship.speed,
+            ship.waypoint.clone(),
+            dt,
+        );
+
+        ctx.db.ship().id().update(Ship {
+            x: new_x,
+            y: new_y,
+            heading: new_heading,
+            speed: new_speed,
+            waypoint: new_waypoint,
+            ..ship
+        });
+    }
+
+    // Missile Logic
+    let mut missiles_to_delete = Vec::new();
+    let mut ships_to_delete = Vec::new();
+
+    for missile in ctx.db.missile().iter() {
+        let mut target_x = missile.target_x;
+        let mut target_y = missile.target_y;
+
+        // If it's a guided missile, update its target coordinates to the ship's current position
+        if let Some(target_ship_id) = missile.target_ship_id {
+            if let Some(target_ship) = ctx.db.ship().id().find(target_ship_id) {
+                target_x = target_ship.x;
+                target_y = target_ship.y;
+            }
+        }
+
+        let dx = target_x - missile.x;
+        let dy = target_y - missile.y;
+        let distance = (dx * dx + dy * dy).sqrt();
+
+        // 1. Check for CIWS Intercepts from ANY nearby ship (not just the target)
+        let mut intercepted = false;
+        for ship in ctx.db.ship().iter() {
+            // Only your own or allied ships would intercept? 
+            // Actually, in a simulation, any ship might try to defend itself or its fleet.
+            // For now, let's say ANY ship within CIWS range that is NOT the owner of the missile tries to intercept.
+            if ship.owner_id != missile.owner_id {
+                let sdx = ship.x - missile.x;
+                let sdy = ship.y - missile.y;
+                let s_dist = (sdx * sdx + sdy * sdy).sqrt();
+
+                if s_dist <= CIWS_RANGE {
+                    let prob = ship.ship_class.ciws_probability();
+                    if ctx.rng().gen_bool(prob as f64) {
+                        intercepted = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if intercepted {
+            missiles_to_delete.push(missile.id);
+            continue;
+        }
+
+        // 2. Check for Impact
+        if distance <= ARRIVAL_DISTANCE {
+            missiles_to_delete.push(missile.id);
+            // If it was targeting a ship, that ship is destroyed
+            if let Some(target_ship_id) = missile.target_ship_id {
+                ships_to_delete.push(target_ship_id);
+            }
+            continue;
+        }
+
+        // 3. Move towards target
+        let heading = dy.atan2(dx);
+        let new_x = missile.x + missile.speed * heading.cos() * dt;
+        let new_y = missile.y + missile.speed * heading.sin() * dt;
+
+        ctx.db.missile().id().update(Missile {
+            x: new_x,
+            y: new_y,
+            heading,
+            target_x,
+            target_y,
+            ..missile
+        });
+    }
+
+    for id in missiles_to_delete {
+        ctx.db.missile().id().delete(id);
+    }
+
+    for id in ships_to_delete {
+        ctx.db.ship().id().delete(id);
+    }
+
+    Ok(())
+}
+use crate::physics::MISSILE_SPEED_MULTIPLIER;
+use crate::tables::{missile, player, ship, Missile, Ship};
+use crate::types::{ShipClass, Waypoint};
+use spacetimedb::{reducer, ReducerContext, Table};
+
+#[reducer]
+pub fn spawn_ship(ctx: &ReducerContext, ship_class: ShipClass, x: f32, y: f32) -> Result<(), String> {
+    if ctx.db.player().identity().find(ctx.sender()).is_none() {
+        return Err("Player not registered".to_string());
+    }
+
+    ctx.db.ship().insert(Ship {
+        id: 0,
+        owner_id: ctx.sender(),
+        ship_class,
+        x,
+        y,
+        heading: 0.0,
+        speed: 0.0,
+        radar_on: true,
+        waypoint: None,
+    });
+
+    Ok(())
+}
+
+#[reducer]
+pub fn set_waypoint(
+    ctx: &ReducerContext,
+    ship_id: u64,
+    target_x: f32,
+    target_y: f32,
+    target_speed: f32,
+) -> Result<(), String> {
+    let ship = ctx.db.ship().id().find(ship_id).ok_or("Ship not found")?;
+
+    if ship.owner_id != ctx.sender() {
+        return Err("Not your ship".to_string());
+    }
+
+    // Cap target speed by ship class
+    let max_speed = ship.ship_class.max_speed();
+    let final_target_speed = target_speed.min(max_speed);
+
+    ctx.db.ship().id().update(Ship {
+        waypoint: Some(Waypoint {
+            x: target_x,
+            y: target_y,
+            target_speed: final_target_speed,
+        }),
+        ..ship
+    });
+
+    Ok(())
+}
+
+#[reducer]
+pub fn toggle_radar(ctx: &ReducerContext, ship_id: u64) -> Result<(), String> {
+    let ship = ctx.db.ship().id().find(ship_id).ok_or("Ship not found")?;
+
+    if ship.owner_id != ctx.sender() {
+        return Err("Not your ship".to_string());
+    }
+
+    ctx.db.ship().id().update(Ship {
+        radar_on: !ship.radar_on,
+        ..ship
+    });
+
+    Ok(())
+}
+
+#[reducer]
+pub fn fire_missile(
+    ctx: &ReducerContext,
+    ship_id: u64,
+    target_x: f32,
+    target_y: f32,
+    target_ship_id: Option<u64>,
+) -> Result<(), String> {
+    let ship = ctx.db.ship().id().find(ship_id).ok_or("Ship not found")?;
+
+    if ship.owner_id != ctx.sender() {
+        return Err("Not your ship".to_string());
+    }
+
+    let missile_speed = ship.speed.max(5.0) * MISSILE_SPEED_MULTIPLIER;
+
+    ctx.db.missile().insert(Missile {
+        id: 0,
+        owner_id: ctx.sender(),
+        x: ship.x,
+        y: ship.y,
+        heading: ship.heading,
+        speed: missile_speed,
+        target_x,
+        target_y,
+        target_ship_id,
+    });
+
+    Ok(())
+}
+
+### Review Criteria
+1. **Kinematics Correctness:** Are the vector calculations for ships and missiles robust? Any edge cases (e.g. division by zero, floating point precision)?
+2. **SpaceTimeDB Best Practices:** Is the database usage efficient? Are reducers kept atomic and performant?
+3. **Combat Logic:** Is the CIWS probability check and missile impact logic sound?
+4. **Maintainability:** Is the code idiomatic Rust?
+
+### Constraints
+- SpaceTimeDB reducers must be deterministic.
+- Avoid heavy computation in the 10Hz physics loop if possible.
