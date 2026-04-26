@@ -8,6 +8,7 @@
 
 import { DbConnection } from './module_bindings';
 import type { ErrorContext } from './module_bindings';
+import type { Identity } from 'spacetimedb';
 import type { Player, Ship, Missile } from './module_bindings/types';
 
 /**
@@ -22,6 +23,9 @@ export class SpacetimeManager {
   private connection: DbConnection | null = null;
   private isConnected: boolean = false;
   private isConnecting: boolean = false;
+
+  // The identity of the local user, captured on connect
+  private localIdentity: Identity | null = null;
 
   // Event listeners for state changes
   private listeners: Set<() => void> = new Set();
@@ -57,8 +61,9 @@ export class SpacetimeManager {
       this.connection = await DbConnection.builder()
         .withUri(wsUrl)
         .withDatabaseName('iron-admiral')
-        .onConnect(() => {
-          console.log('[SpacetimeManager] Connection established');
+        .onConnect((_conn: DbConnection, identity: Identity) => {
+          console.log('[SpacetimeManager] Connection established, identity:', identity.toHexString());
+          this.localIdentity = identity;
           this.handleConnectionEstablished();
         })
         .onDisconnect(() => {
@@ -151,6 +156,17 @@ export class SpacetimeManager {
    */
   public isOnline(): boolean {
     return this.isConnected;
+  }
+
+  /**
+   * Get the local user's identity as a hex string.
+   * Returns null if not yet connected.
+   */
+  public getUserIdentity(): string | null {
+    if (!this.localIdentity) {
+      return null;
+    }
+    return this.localIdentity.toHexString();
   }
 
   /**
@@ -401,6 +417,7 @@ export class SpacetimeManager {
    */
   private handleDisconnect(): void {
     this.isConnected = false;
+    this.localIdentity = null;
     this.notifyListeners();
   }
 
