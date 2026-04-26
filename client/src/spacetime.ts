@@ -55,6 +55,7 @@ export class SpacetimeManager {
       // Build and establish connection
       this.connection = await DbConnection.builder()
         .withUri(wsUrl)
+        .withDatabaseName('iron-admiral')
         .onConnect(() => {
           console.log('[SpacetimeManager] Connection established');
           this.handleConnectionEstablished();
@@ -314,7 +315,7 @@ export class SpacetimeManager {
     }
 
     try {
-      (this.connection.reducers as any).registerPlayer(nickname);
+      (this.connection.reducers as any).registerPlayer({ name: nickname });
     } catch (error) {
       console.error('[SpacetimeManager] Error registering player:', error);
       throw error;
@@ -371,8 +372,12 @@ export class SpacetimeManager {
     }
 
     try {
-      const shipClassValue = shipClass === 'Carrier' ? { Carrier: {} } : { ArleighBurke: {} };
-      (this.connection.reducers as any).spawnShip(shipClassValue, x, y);
+      const shipClassValue = { tag: shipClass };
+      (this.connection.reducers as any).spawnShip({
+        shipClass: shipClassValue,
+        x,
+        y,
+      });
     } catch (error) {
       console.error('[SpacetimeManager] Error spawning ship:', error);
       throw error;

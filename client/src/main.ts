@@ -20,6 +20,7 @@ const renderer = initializeRenderer("app");
 
 // Initialize SpaceTimeDB connection
 const spacetimeManager = SpacetimeManager.getInstance();
+(window as any).spacetimeManager = spacetimeManager;
 
 // Get canvas element for interaction setup
 const canvas = document.querySelector('canvas') as HTMLCanvasElement;
