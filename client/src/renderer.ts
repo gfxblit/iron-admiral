@@ -33,6 +33,9 @@ export class Canvas2DRenderer {
   // Interaction state
   private selectedShipId: bigint | null = null;
 
+  // Fire mode targeting state
+  private fireModeTargetShipId: bigint | null = null;
+
   // Color scheme
   private colors = {
     arleighBurkeShip: '#4A90E2', // Blue
@@ -43,6 +46,10 @@ export class Canvas2DRenderer {
     background: '#001a33', // Dark blue
     grid: '#003366', // Grid color
     selected: '#FF6B6B', // Red for selected ship
+    radarRing: '#50E3C2', // Teal for radar range ring
+    radarFill: 'rgba(80, 227, 194, 0.05)', // Faint fill inside radar ring
+    fireModeTarget: '#FF6B6B', // Red highlight for fire mode target
+    fireModeTargetStroke: '#FF0000', // Bright red stroke for fire mode target
   };
 
   constructor(canvas: HTMLCanvasElement | string) {
@@ -158,6 +165,23 @@ export class Canvas2DRenderer {
         this.renderShip(ship);
       }
 
+      // Draw fire mode targeting highlight on top of ships
+      if (this.fireModeTargetShipId !== null) {
+        const targetShip = ships.find(s => s.id === this.fireModeTargetShipId);
+        if (targetShip) {
+          const [tx, ty] = this.worldToCanvas(targetShip.x, targetShip.y);
+          this.ctx.save();
+          this.ctx.beginPath();
+          this.ctx.arc(tx, ty, 28, 0, Math.PI * 2);
+          this.ctx.fillStyle = this.colors.fireModeTarget;
+          this.ctx.fill();
+          this.ctx.strokeStyle = this.colors.fireModeTargetStroke;
+          this.ctx.lineWidth = 3;
+          this.ctx.stroke();
+          this.ctx.restore();
+        }
+      }
+
       // Render all missiles
       for (const missile of missiles) {
         this.renderMissile(missile);
@@ -220,6 +244,24 @@ export class Canvas2DRenderer {
 
     // Check if this is the selected ship
     const isSelected = this.selectedShipId !== null && this.selectedShipId === ship.id;
+
+    // Draw radar ring if radar is active
+    if (ship.radarOn) {
+      // ArleighBurke has 800 world-unit radar, Carrier has 500
+      const radarRangeWorld = isCarrier ? 500 : 800;
+      const radarRadiusCanvas = radarRangeWorld * this.scale;
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.arc(canvasX, canvasY, radarRadiusCanvas, 0, Math.PI * 2);
+      this.ctx.fillStyle = this.colors.radarFill;
+      this.ctx.fill();
+      this.ctx.strokeStyle = this.colors.radarRing;
+      this.ctx.lineWidth = 1.5;
+      this.ctx.setLineDash([6, 4]);
+      this.ctx.stroke();
+      this.ctx.setLineDash([]);
+      this.ctx.restore();
+    }
 
     // Save context state
     this.ctx.save();
@@ -429,6 +471,20 @@ export class Canvas2DRenderer {
    */
   public getSelectedShip(): bigint | null {
     return this.selectedShipId;
+  }
+
+  /**
+   * Set the fire mode target ship ID (for targeting highlight)
+   */
+  public setFireModeTarget(shipId: bigint | null): void {
+    this.fireModeTargetShipId = shipId;
+  }
+
+  /**
+   * Get the fire mode target ship ID
+   */
+  public getFireModeTarget(): bigint | null {
+    return this.fireModeTargetShipId;
   }
 
   /**
