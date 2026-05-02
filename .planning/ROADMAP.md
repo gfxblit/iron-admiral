@@ -20,19 +20,19 @@ Existing milestone subtasks (work already partially completed locally — see ST
 - [x] 3.4: Visual/Canvas Verification Test
 - [x] 3.5: CI Integration (GitHub Actions update) — covered by 03-02-PLAN.md
 
-## Phase 4: UI Controls for Existing Features (Current)
+## Phase 4: UI Controls for Existing Features ✓ Complete
 **Goal:** Surface existing backend features (radar toggle, missile firing) through keyboard shortcuts and canvas visuals so the game is fully playtestable without browser devtools.
 
 Plans:
 - [x] 04-01-PLAN.md — Touch-First UI Controls (Radar, Fire, Deselect)
-- [ ] 04-02-PLAN.md — Pinch-to-Zoom & Tactical Scaling
+- [x] 04-02-PLAN.md — Pinch-to-Zoom & Tactical Scaling
 
 Tasks:
 - [x] Keyboard shortcuts: R = toggle radar on selected ship, F = enter fire mode
 - [x] Fire mode: click enemy ship to fire missile from selected ship
 - [x] Radar circle overlay on canvas when radar_on = true
-- [ ] Pinch-to-zoom and mouse wheel support
+- [x] Pinch-to-zoom and mouse wheel support
 
-## Phase 5: Advanced Mechanics & UI (Next)
+## Phase 5: Advanced Mechanics & UI (Current)
 - [ ] Fog of War (visibility filtering by radar range)
 - [ ] Advanced UI Overlays
