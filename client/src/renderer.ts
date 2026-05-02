@@ -337,7 +337,7 @@ export class Canvas2DRenderer {
     );
 
     // Text
-    this.ctx.fillStyle = isSelected ? 'white' : 'white';
+    this.ctx.fillStyle = 'white';
     this.ctx.fillText(label, x, y + 20);
   }
 
