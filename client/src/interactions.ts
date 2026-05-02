@@ -39,6 +39,7 @@ export class InteractionManager {
 
   // UI feedback elements
   private statusElement: HTMLElement | null = null;
+  private statusTimerId: ReturnType<typeof setTimeout> | null = null;
 
   // Mobile action overlay elements
   private mobileActions: HTMLElement | null = null;
@@ -591,11 +592,17 @@ export class InteractionManager {
   private showStatus = (message: string): void => {
     if (this.statusElement) {
       this.statusElement.textContent = message;
+
+      if (this.statusTimerId !== null) {
+        clearTimeout(this.statusTimerId);
+      }
+
       // Auto-clear after 3 seconds
-      setTimeout(() => {
+      this.statusTimerId = setTimeout(() => {
         if (this.statusElement) {
           this.statusElement.textContent = '';
         }
+        this.statusTimerId = null;
       }, 3000);
     }
   };
