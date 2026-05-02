@@ -26,10 +26,10 @@ import * as fs from 'fs';
   
   console.log('Selecting ship via InteractionManager...');
   await page.evaluate(() => {
-    // @ts-ignore
+    // @ts-expect-error - window.spacetimeManager is exposed in main.ts
     const ships = Array.from(window.spacetimeManager.shipTable.values());
     if (ships.length > 0) {
-      // @ts-ignore
+      // @ts-expect-error - window.interactionManager is exposed in main.ts
       window.interactionManager.selectShipById(ships[ships.length - 1].shipId);
     }
   });

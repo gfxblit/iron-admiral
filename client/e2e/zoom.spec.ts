@@ -15,7 +15,7 @@ test.describe('zoom and scaling', () => {
 
   test('default scale is 0.2', async ({ page }) => {
     const scale = await page.evaluate(() => {
-      // @ts-expect-error - window.renderer exposed in main.ts
+      // @ts-expect-error - window.renderer is exposed in main.ts for E2E testing
       return window.renderer.getScale();
     });
     expect(scale).toBeCloseTo(0.2);
@@ -23,7 +23,7 @@ test.describe('zoom and scaling', () => {
 
   test('mouse wheel zooms in and out', async ({ page }) => {
     const initialScale = await page.evaluate(() => {
-      // @ts-expect-error
+      // @ts-expect-error - window.renderer is exposed in main.ts for E2E testing
       return window.renderer.getScale();
     });
 
@@ -36,7 +36,7 @@ test.describe('zoom and scaling', () => {
     await page.mouse.wheel(0, -100);
 
     const zoomedInScale = await page.evaluate(() => {
-      // @ts-expect-error
+      // @ts-expect-error - window.renderer is exposed in main.ts for E2E testing
       return window.renderer.getScale();
     });
     expect(zoomedInScale).toBeGreaterThan(initialScale);
@@ -45,7 +45,7 @@ test.describe('zoom and scaling', () => {
     await page.mouse.wheel(0, 200);
 
     const zoomedOutScale = await page.evaluate(() => {
-      // @ts-expect-error
+      // @ts-expect-error - window.renderer is exposed in main.ts for E2E testing
       return window.renderer.getScale();
     });
     expect(zoomedOutScale).toBeLessThan(zoomedInScale);
@@ -63,7 +63,7 @@ test.describe('zoom and scaling', () => {
       await page.mouse.wheel(0, -100);
     }
     const maxScale = await page.evaluate(() => {
-      // @ts-expect-error
+      // @ts-expect-error - window.renderer is exposed in main.ts for E2E testing
       return window.renderer.getScale();
     });
     expect(maxScale).toBeCloseTo(2.0);
@@ -73,7 +73,7 @@ test.describe('zoom and scaling', () => {
       await page.mouse.wheel(0, 100);
     }
     const minScale = await page.evaluate(() => {
-      // @ts-expect-error
+      // @ts-expect-error - window.renderer is exposed in main.ts for E2E testing
       return window.renderer.getScale();
     });
     expect(minScale).toBeCloseTo(0.05);
