@@ -33,7 +33,8 @@ async function initializeGame() {
     const stdbParam = new URLSearchParams(window.location.search).get("stdb");
     // If no explicit host given, route through Vite's /v1/ proxy so
     // non-localhost clients (iPad on LAN) reach SpaceTimeDB via Vite rather than directly.
-    const stdbUrl = stdbParam
+    const hostPortPattern = /^[a-zA-Z0-9.\-]+(:\d+)?$/;
+    const stdbUrl = stdbParam && hostPortPattern.test(stdbParam)
       ? `ws://${stdbParam}`
       : `ws://${window.location.host}`;
     await spacetimeManager.connect(stdbUrl);
