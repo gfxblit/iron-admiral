@@ -48,7 +48,7 @@ export class Canvas2DRenderer {
     selected: '#FF6B6B', // Red for selected ship
     radarRing: '#50E3C2', // Teal for radar range ring
     radarFill: 'rgba(80, 227, 194, 0.05)', // Faint fill inside radar ring
-    fireModeTarget: '#FF6B6B', // Red highlight for fire mode target
+    fireModeTarget: 'rgba(255, 107, 107, 0.35)', // semi-transparent red
     fireModeTargetStroke: '#FF0000', // Bright red stroke for fire mode target
   };
 
