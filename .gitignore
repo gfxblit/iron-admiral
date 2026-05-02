@@ -25,7 +25,8 @@ Cargo.lock
 # SpaceTimeDB local config
 *.local.json
 .spacetime/
-dashboard/runtime/
+**/dashboard/
+**/dashboard/runtime/
 
 # Environment
 .env
