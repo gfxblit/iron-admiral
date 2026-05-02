@@ -6,6 +6,12 @@ export default defineConfig({
   server: {
     host: true,
     allowedHosts: ["bills-macbook-pro-16in-m2-max.tail8bc4f8.ts.net"],
+    proxy: {
+      "/v1/": {
+        target: "ws://localhost:3000",
+        ws: true,
+      },
+    },
   },
   test: {
     environment: "jsdom",

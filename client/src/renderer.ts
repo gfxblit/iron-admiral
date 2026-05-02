@@ -24,14 +24,18 @@ export class Canvas2DRenderer {
   private animationFrameId: number | null = null;
   private spacetimeManager: SpacetimeManager;
   private isRunning: boolean = false;
+  private resizeListener: (() => void) | null = null;
 
   // Camera/viewport settings
   private centerX: number;
   private centerY: number;
-  private scale: number = 1; // pixels per game world unit
+  private scale: number = 0.2; // pixels per game world unit
 
   // Interaction state
   private selectedShipId: bigint | null = null;
+
+  // Fire mode targeting state
+  private fireModeTargetShipId: bigint | null = null;
 
   // Color scheme
   private colors = {
@@ -43,6 +47,10 @@ export class Canvas2DRenderer {
     background: '#001a33', // Dark blue
     grid: '#003366', // Grid color
     selected: '#FF6B6B', // Red for selected ship
+    radarRing: '#50E3C2', // Teal for radar range ring
+    radarFill: 'rgba(80, 227, 194, 0.05)', // Faint fill inside radar ring
+    fireModeTarget: 'rgba(255, 107, 107, 0.35)', // semi-transparent red
+    fireModeTargetStroke: '#FF0000', // Bright red stroke for fire mode target
   };
 
   constructor(canvas: HTMLCanvasElement | string) {
@@ -111,6 +119,25 @@ export class Canvas2DRenderer {
   }
 
   /**
+   * Set the resize listener for cleanup
+   */
+  public setResizeListener(listener: () => void): void {
+    this.resizeListener = listener;
+  }
+
+  /**
+   * Cleanup and destroy the renderer
+   */
+  public destroy(): void {
+    this.stop();
+    if (this.resizeListener) {
+      window.removeEventListener('resize', this.resizeListener);
+      this.resizeListener = null;
+    }
+    console.log('[Renderer] Renderer destroyed and listeners removed');
+  }
+
+  /**
    * Set camera center position in world space
    */
   public setCameraCenter(x: number, y: number): void {
@@ -125,7 +152,7 @@ export class Canvas2DRenderer {
    * Set zoom/scale level (pixels per world unit)
    */
   public setScale(scale: number): void {
-    this.scale = Math.max(0.1, scale);
+    this.scale = Math.max(0.05, Math.min(2.0, scale));
   }
 
   /**
@@ -156,6 +183,23 @@ export class Canvas2DRenderer {
       // Render all ships
       for (const ship of ships) {
         this.renderShip(ship);
+      }
+
+      // Draw fire mode targeting highlight on top of ships
+      if (this.fireModeTargetShipId !== null) {
+        const targetShip = ships.find(s => s.id === this.fireModeTargetShipId);
+        if (targetShip) {
+          const [tx, ty] = this.worldToCanvas(targetShip.x, targetShip.y);
+          this.ctx.save();
+          this.ctx.beginPath();
+          this.ctx.arc(tx, ty, 28, 0, Math.PI * 2);
+          this.ctx.fillStyle = this.colors.fireModeTarget;
+          this.ctx.fill();
+          this.ctx.strokeStyle = this.colors.fireModeTargetStroke;
+          this.ctx.lineWidth = 3;
+          this.ctx.stroke();
+          this.ctx.restore();
+        }
       }
 
       // Render all missiles
@@ -211,15 +255,37 @@ export class Canvas2DRenderer {
   private renderShip(ship: Ship): void {
     const [canvasX, canvasY] = this.worldToCanvas(ship.x, ship.y);
 
-    // Ship size - larger for carrier, smaller for destroyer
+    // Ship size in world units - larger for carrier, smaller for destroyer
     const isCarrier = 'Carrier' in ship.shipClass;
-    const shipSize = isCarrier ? 20 : 15;
+    const baseWorldSize = isCarrier ? 40 : 30; // Doubled so at scale 0.5 it looks like original
+    
+    // Calculate pixel size based on scale, but maintain a minimum visibility
+    const minPixelSize = 5;
+    const shipSize = Math.max(baseWorldSize * this.scale, minPixelSize);
 
     // Choose color based on ship class
     const fillColor = isCarrier ? this.colors.carrierShip : this.colors.arleighBurkeShip;
 
     // Check if this is the selected ship
     const isSelected = this.selectedShipId !== null && this.selectedShipId === ship.id;
+
+    // Draw radar ring if radar is active
+    if (ship.radarOn) {
+      // ArleighBurke has 800 world-unit radar, Carrier has 500
+      const radarRangeWorld = isCarrier ? 500 : 800;
+      const radarRadiusCanvas = radarRangeWorld * this.scale;
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.arc(canvasX, canvasY, radarRadiusCanvas, 0, Math.PI * 2);
+      this.ctx.fillStyle = this.colors.radarFill;
+      this.ctx.fill();
+      this.ctx.strokeStyle = this.colors.radarRing;
+      this.ctx.lineWidth = 1.5;
+      this.ctx.setLineDash([6, 4]);
+      this.ctx.stroke();
+      this.ctx.setLineDash([]);
+      this.ctx.restore();
+    }
 
     // Save context state
     this.ctx.save();
@@ -295,7 +361,7 @@ export class Canvas2DRenderer {
     );
 
     // Text
-    this.ctx.fillStyle = isSelected ? 'white' : 'white';
+    this.ctx.fillStyle = 'white';
     this.ctx.fillText(label, x, y + 20);
   }
 
@@ -432,6 +498,20 @@ export class Canvas2DRenderer {
   }
 
   /**
+   * Set the fire mode target ship ID (for targeting highlight)
+   */
+  public setFireModeTarget(shipId: bigint | null): void {
+    this.fireModeTargetShipId = shipId;
+  }
+
+  /**
+   * Get the fire mode target ship ID
+   */
+  public getFireModeTarget(): bigint | null {
+    return this.fireModeTargetShipId;
+  }
+
+  /**
    * Get viewport center position
    */
   public getViewportCenter(): [number, number] {
@@ -480,6 +560,7 @@ export function initializeRenderer(containerId: string = 'app'): Canvas2DRendere
 
   // Create renderer
   const renderer = new Canvas2DRenderer(canvas);
+  renderer.setResizeListener(resizeCanvas);
 
   // Start rendering
   renderer.start();

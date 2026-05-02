@@ -20,6 +20,9 @@ import type { Ship } from './module_bindings/types';
  * - Visual feedback
  */
 export class InteractionManager {
+  /** World radius in units — must match the server's WORLD_RADIUS constant in lib.rs */
+  private static readonly WORLD_RADIUS = 5000;
+
   private canvas: HTMLCanvasElement;
   private spacetimeManager: SpacetimeManager;
   private renderer: Canvas2DRenderer;
@@ -31,8 +34,20 @@ export class InteractionManager {
   // Guard to prevent duplicate registration calls from rapid clicks
   private isRegistering: boolean = false;
 
+  // Fire mode state
+  private fireModeActive: boolean = false;
+
   // UI feedback elements
   private statusElement: HTMLElement | null = null;
+  private statusTimerId: ReturnType<typeof setTimeout> | null = null;
+
+  // Mobile action overlay elements
+  private mobileActions: HTMLElement | null = null;
+  private fireButton: HTMLButtonElement | null = null;
+
+  // Zoom state
+  private initialTouchDistance: number | null = null;
+  private initialScale: number = 1;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -50,7 +65,7 @@ export class InteractionManager {
       this.statusElement = document.createElement('div');
       this.statusElement.id = 'interaction-status';
       this.statusElement.style.cssText = `
-        position: absolute;
+        position: fixed;
         top: 80px;
         left: 10px;
         color: #50E3C2;
@@ -65,9 +80,21 @@ export class InteractionManager {
       document.body.appendChild(this.statusElement);
     }
 
+    // Create mobile action overlay
+    this.createMobileActions();
+
     // Bind event handlers
     this.canvas.addEventListener('click', this.handleLeftClick);
     this.canvas.addEventListener('contextmenu', this.handleRightClick);
+    this.canvas.addEventListener('wheel', this.handleWheel, { passive: false });
+
+    // Prevent scroll/zoom during gameplay on iOS/touch devices
+    this.canvas.addEventListener('touchstart', this.handleTouchStart, { passive: false });
+    this.canvas.addEventListener('touchmove', this.handleTouchMove, { passive: false });
+    this.canvas.addEventListener('touchend', this.handleTouchEnd, { passive: false });
+
+    // Keyboard shortcuts: R = radar, F = fire mode, Escape = deselect
+    document.addEventListener('keydown', this.handleKeyDown);
 
     // Subscribe to state updates to track player identity and ships
     this.spacetimeManager.subscribe(() => {
@@ -76,6 +103,91 @@ export class InteractionManager {
 
     console.log('[InteractionManager] Initialized');
   }
+
+  /**
+   * Create the floating mobile action overlay with RADAR, FIRE, DESELECT buttons.
+   * Hidden by default; visibility is controlled by updateMobileActionsVisibility().
+   */
+  private createMobileActions = (): void => {
+    // Remove existing overlay if present (e.g., re-init)
+    const existing = document.getElementById('mobile-actions');
+    if (existing) {
+      existing.remove();
+    }
+
+    this.mobileActions = document.createElement('div');
+    this.mobileActions.id = 'mobile-actions';
+    this.mobileActions.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 20;
+    `;
+
+    const buttonStyle = `
+      width: 60px;
+      height: 60px;
+      background: rgba(0,0,0,0.8);
+      border: 1px solid #50E3C2;
+      border-radius: 8px;
+      color: #50E3C2;
+      font-family: monospace;
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+      min-width: 44px;
+      min-height: 44px;
+    `;
+
+    const radarButton = document.createElement('button');
+    radarButton.id = 'btn-radar';
+    radarButton.textContent = 'RADAR';
+    radarButton.style.cssText = buttonStyle;
+    radarButton.addEventListener('click', this.handleRadarButton);
+    radarButton.addEventListener('touchend', (e) => { e.preventDefault(); this.handleRadarButton(); });
+
+    this.fireButton = document.createElement('button');
+    this.fireButton.id = 'btn-fire';
+    this.fireButton.textContent = 'FIRE';
+    this.fireButton.style.cssText = buttonStyle;
+    this.fireButton.addEventListener('click', this.handleFireButton);
+    this.fireButton.addEventListener('touchend', (e) => { e.preventDefault(); this.handleFireButton(); });
+
+    const deselectButton = document.createElement('button');
+    deselectButton.id = 'btn-deselect';
+    deselectButton.textContent = 'DESEL';
+    deselectButton.style.cssText = buttonStyle;
+    deselectButton.addEventListener('click', this.handleDeselectButton);
+    deselectButton.addEventListener('touchend', (e) => { e.preventDefault(); this.handleDeselectButton(); });
+
+    this.mobileActions.appendChild(radarButton);
+    this.mobileActions.appendChild(this.fireButton);
+    this.mobileActions.appendChild(deselectButton);
+
+    const container = document.getElementById('game-container') || document.body;
+    container.appendChild(this.mobileActions);
+    console.log('[InteractionManager] Mobile actions overlay created and appended to', container.id || 'body');
+  };
+
+  /**
+   * Show or hide the mobile actions overlay based on ship selection.
+   */
+  private updateMobileActionsVisibility = (): void => {
+    if (!this.mobileActions) return;
+    const shouldShow = this.selectedShipId !== null;
+    this.mobileActions.style.display = shouldShow ? 'flex' : 'none';
+    console.log(`[InteractionManager] Mobile actions visibility: ${shouldShow ? 'VISIBLE' : 'HIDDEN'} (Selected: ${this.selectedShipId})`);
+  };
 
   /**
    * Update player state from SpacetimeManager.
@@ -88,6 +200,14 @@ export class InteractionManager {
 
     if (!localIdentityHex) {
       return;
+    }
+
+    const shipIds = new Set(ships.map((s) => s.id));
+
+    // Clear stale selection when the selected ship no longer exists
+    if (this.selectedShipId !== null && !shipIds.has(this.selectedShipId)) {
+      this.deselectShip();
+      this.showStatus('Selected ship was destroyed');
     }
 
     // Clear and rebuild the local player's ship set using the authoritative local identity
@@ -171,8 +291,9 @@ export class InteractionManager {
   /**
    * Register the player.
    * Sets isRegistering to prevent duplicate calls until the server confirms registration.
+   * Async so that async reducer rejections are caught and isRegistering is reset on failure.
    */
-  private registerPlayer = (): void => {
+  private registerPlayer = async (): Promise<void> => {
     try {
       // Generate a nickname for the player
       const nickname = `Player_${Math.floor(Math.random() * 10000)}`;
@@ -180,8 +301,8 @@ export class InteractionManager {
       // Set guard before calling the reducer to block rapid duplicate clicks
       this.isRegistering = true;
 
-      // Call registerPlayer reducer
-      this.spacetimeManager.registerPlayer(nickname);
+      // Await the async reducer call so rejections propagate to the catch block
+      await this.spacetimeManager.registerPlayer(nickname);
 
       this.showStatus('Registering player...');
     } catch (error) {
@@ -192,11 +313,41 @@ export class InteractionManager {
   };
 
   /**
-   * Handle spawn ship or select existing ship
+   * Handle spawn ship or select existing ship.
+   * When fire mode is active, clicking on a ship fires a missile at it;
+   * clicking on empty space cancels fire mode.
    */
   private handleSpawnOrSelect = (canvasX: number, canvasY: number): void => {
     // Check if clicking on an existing ship
     const clickedShip = this.getShipAtCanvasPosition(canvasX, canvasY);
+
+    if (this.fireModeActive) {
+      if (clickedShip && this.selectedShipId !== null) {
+        // Fire a missile at the target ship
+        this.renderer.setFireModeTarget(clickedShip.id);
+        this.spacetimeManager.fireMissile(this.selectedShipId, clickedShip.id)
+          .then(() => {
+            this.showStatus(`Missile fired at ship ${clickedShip.id}`);
+          })
+          .catch((error) => {
+            console.error('[InteractionManager] Error firing missile:', error);
+            this.showStatus('Failed to fire missile');
+          })
+          .finally(() => {
+            // Exit fire mode after shot
+            this.fireModeActive = false;
+            this.renderer.setFireModeTarget(null);
+            this.updateFireButtonStyle();
+          });
+      } else {
+        // Tapped empty space — cancel fire mode
+        this.fireModeActive = false;
+        this.renderer.setFireModeTarget(null);
+        this.updateFireButtonStyle();
+        this.showStatus('Fire mode cancelled');
+      }
+      return;
+    }
 
     if (clickedShip) {
       // Select the clicked ship
@@ -238,6 +389,20 @@ export class InteractionManager {
     this.selectedShipId = shipId;
     // Update renderer to highlight the selected ship
     this.renderer.setSelectedShip(shipId);
+    // Show the mobile action overlay now that a ship is selected
+    this.updateMobileActionsVisibility();
+  };
+
+  /**
+   * Deselect current ship and exit any active modes
+   */
+  private deselectShip = (): void => {
+    this.selectedShipId = null;
+    this.fireModeActive = false;
+    this.renderer.setSelectedShip(null);
+    this.renderer.setFireModeTarget(null);
+    this.updateMobileActionsVisibility();
+    this.updateFireButtonStyle();
   };
 
   /**
@@ -308,10 +473,168 @@ export class InteractionManager {
    * Validate waypoint is within bounds
    */
   private isWaypointValid = (worldX: number, worldY: number): boolean => {
-    // Define reasonable game bounds
-    const maxDistance = 5000; // World units from origin
     const distanceFromOrigin = Math.sqrt(worldX * worldX + worldY * worldY);
-    return distanceFromOrigin <= maxDistance;
+    return distanceFromOrigin <= InteractionManager.WORLD_RADIUS;
+  };
+
+  /**
+   * Handle RADAR button press — toggle radar on selected ship
+   */
+  private handleRadarButton = (): void => {
+    if (this.selectedShipId === null) return;
+    this.spacetimeManager.toggleRadar(this.selectedShipId)
+      .then(() => {
+        this.showStatus('Radar toggled');
+      })
+      .catch((error) => {
+        console.error('[InteractionManager] Error toggling radar:', error);
+        this.showStatus('Failed to toggle radar');
+      });
+  };
+
+  /**
+   * Handle FIRE button press — enter fire mode
+   */
+  private handleFireButton = (): void => {
+    if (this.selectedShipId === null) return;
+    this.fireModeActive = !this.fireModeActive;
+    this.renderer.setFireModeTarget(null);
+    this.updateFireButtonStyle();
+    if (this.fireModeActive) {
+      this.showStatus('FIRE MODE ACTIVE - TAP TARGET');
+    } else {
+      this.showStatus('Fire mode cancelled');
+    }
+  };
+
+  /**
+   * Handle DESELECT button press — clear selection and exit all modes
+   */
+  private handleDeselectButton = (): void => {
+    this.deselectShip();
+    this.showStatus('');
+  };
+
+  /**
+   * Update fire button visual style to reflect active/inactive fire mode
+   */
+  private updateFireButtonStyle = (): void => {
+    if (!this.fireButton) return;
+    if (this.fireModeActive) {
+      this.fireButton.style.border = '2px solid #FF0000';
+      this.fireButton.style.color = '#FF6B6B';
+      this.fireButton.style.animation = 'none';
+    } else {
+      this.fireButton.style.border = '1px solid #50E3C2';
+      this.fireButton.style.color = '#50E3C2';
+    }
+  };
+
+  /**
+   * Handle mouse wheel zoom
+   */
+  private handleWheel = (event: WheelEvent): void => {
+    event.preventDefault();
+    const zoomSpeed = 1.1;
+    const currentScale = this.renderer.getScale();
+    let newScale = currentScale;
+
+    if (event.deltaY < 0) {
+      newScale *= zoomSpeed;
+    } else {
+      newScale /= zoomSpeed;
+    }
+
+    this.renderer.setScale(newScale);
+    this.showStatus(`Zoom: ${Math.round(this.renderer.getScale() * 100)}%`);
+  };
+
+  /**
+   * Handle keyboard shortcuts: R (radar), F (fire mode), Escape (deselect)
+   */
+  private handleKeyDown = (event: KeyboardEvent): void => {
+    switch (event.key.toUpperCase()) {
+      case 'R':
+        this.handleRadarButton();
+        break;
+      case 'F':
+        this.handleFireButton();
+        break;
+      case 'ESCAPE':
+        if (this.fireModeActive) {
+          this.fireModeActive = false;
+          this.renderer.setFireModeTarget(null);
+          this.updateFireButtonStyle();
+          this.showStatus('Fire mode cancelled');
+        } else {
+          this.deselectShip();
+          this.showStatus('');
+        }
+        break;
+    }
+  };
+
+  /**
+   * Handle touch start — prevent default scroll/zoom during gameplay
+   */
+  private handleTouchStart = (event: TouchEvent): void => {
+    if (event.touches.length === 2) {
+      this.initialTouchDistance = this.getTouchDistance(event.touches[0], event.touches[1]);
+      this.initialScale = this.renderer.getScale();
+    }
+    event.preventDefault();
+  };
+
+  /**
+   * Handle touch move — implement pinch-to-zoom
+   */
+  private handleTouchMove = (event: TouchEvent): void => {
+    if (event.touches.length === 2 && this.initialTouchDistance !== null) {
+      event.preventDefault();
+      const currentDistance = this.getTouchDistance(event.touches[0], event.touches[1]);
+      const zoomFactor = currentDistance / this.initialTouchDistance;
+      const newScale = this.initialScale * zoomFactor;
+
+      this.renderer.setScale(newScale);
+      this.showStatus(`Zoom: ${Math.round(this.renderer.getScale() * 100)}%`);
+    }
+  };
+
+  /**
+   * Calculate distance between two touch points
+   */
+  private getTouchDistance = (t1: Touch, t2: Touch): number => {
+    const dx = t1.clientX - t2.clientX;
+    const dy = t1.clientY - t2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  /**
+   * Handle touch end — map single touch to canvas click
+   */
+  private handleTouchEnd = (event: TouchEvent): void => {
+    event.preventDefault();
+    if (event.changedTouches.length === 0) return;
+
+    const touch = event.changedTouches[0];
+    const rect = this.canvas.getBoundingClientRect();
+    const canvasX = touch.clientX - rect.left;
+    const canvasY = touch.clientY - rect.top;
+
+    const localIdentityHex = this.spacetimeManager.getUserIdentity();
+    const localPlayer = localIdentityHex
+      ? this.spacetimeManager.getPlayer(localIdentityHex)
+      : undefined;
+
+    if (!localPlayer) {
+      if (!this.isRegistering) {
+        this.registerPlayer();
+      } else {
+        this.showStatus('Registering... please wait');
+      }
+    } else {
+      this.handleSpawnOrSelect(canvasX, canvasY);
+    }
   };
 
   /**
@@ -320,11 +643,17 @@ export class InteractionManager {
   private showStatus = (message: string): void => {
     if (this.statusElement) {
       this.statusElement.textContent = message;
+
+      if (this.statusTimerId !== null) {
+        clearTimeout(this.statusTimerId);
+      }
+
       // Auto-clear after 3 seconds
-      setTimeout(() => {
+      this.statusTimerId = setTimeout(() => {
         if (this.statusElement) {
           this.statusElement.textContent = '';
         }
+        this.statusTimerId = null;
       }, 3000);
     }
   };
@@ -337,11 +666,28 @@ export class InteractionManager {
   };
 
   /**
+   * Programmatically select a ship by ID — used by E2E tests to bypass canvas hit-testing
+   * ambiguity when multiple ships overlap at the same world position.
+   */
+  public selectShipById = (shipId: bigint): void => {
+    this.selectShip(shipId);
+    this.showStatus(`Selected ship ${shipId}`);
+  };
+
+  /**
    * Cleanup and destroy
    */
   public destroy = (): void => {
     this.canvas.removeEventListener('click', this.handleLeftClick);
     this.canvas.removeEventListener('contextmenu', this.handleRightClick);
+    this.canvas.removeEventListener('wheel', this.handleWheel);
+    this.canvas.removeEventListener('touchstart', this.handleTouchStart);
+    this.canvas.removeEventListener('touchmove', this.handleTouchMove);
+    this.canvas.removeEventListener('touchend', this.handleTouchEnd);
+    document.removeEventListener('keydown', this.handleKeyDown);
+    if (this.mobileActions && this.mobileActions.parentNode) {
+      this.mobileActions.parentNode.removeChild(this.mobileActions);
+    }
   };
 }
 

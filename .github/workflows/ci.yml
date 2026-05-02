@@ -171,14 +171,19 @@ jobs:
         run: |
           spacetime start --in-memory &
           echo "SPACETIME_PID=$!" >> $GITHUB_ENV
-          # Wait for SpacetimeDB to listen on port 3000 (max 60s)
+          READY=0
           for i in $(seq 1 60); do
             if curl -sf http://127.0.0.1:3000/v1/ping >/dev/null 2>&1; then
               echo "SpacetimeDB is up after ${i}s"
+              READY=1
               break
             fi
             sleep 1
           done
+          if [ "$READY" -ne 1 ]; then
+            echo "ERROR: SpacetimeDB did not start within 60 seconds" >&2
+            exit 1
+          fi
 
       - name: Publish iron-admiral module (local)
         working-directory: ./server
