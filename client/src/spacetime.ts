@@ -75,60 +75,79 @@ export class SpacetimeManager {
 
     this.isConnecting = true;
 
-    try {
-      console.log(`[SpacetimeManager] Connecting to ${wsUrl}...`);
+    return new Promise<void>((resolve, reject) => {
+      try {
+        console.log(`[SpacetimeManager] Connecting to ${wsUrl}...`);
 
-      this.connection = DbConnection.builder()
-        .withUri(wsUrl)
-        .withDatabaseName('iron-admiral')
-        .onConnect((_conn: DbConnection, identity: Identity) => {
-          console.log('[SpacetimeManager] Connection established, identity:', identity.toHexString());
-          this.localIdentity = identity;
-          this.isConnected = true;
-          this.isConnecting = false;
-          this.handleConnectionEstablished();
-        })
-        .onDisconnect(() => {
-          console.log('[SpacetimeManager] Disconnected');
-          this.handleDisconnect();
-        })
-        .onConnectError((error) => {
-          console.error('[SpacetimeManager] Connection error:', error);
-          this.handleConnectionError();
-        })
-        .build();
+        this.connection = DbConnection.builder()
+          .withUri(wsUrl)
+          .withDatabaseName('iron-admiral')
+          .onConnect((_conn: DbConnection, identity: Identity) => {
+            console.log('[SpacetimeManager] Connection established, identity:', identity.toHexString());
+            this.localIdentity = identity;
+            this.isConnected = true;
+            this.isConnecting = false;
+            this.handleConnectionEstablished();
+            resolve();
+          })
+          .onDisconnect(() => {
+            console.log('[SpacetimeManager] Disconnected');
+            this.handleDisconnect();
+          })
+          .onConnectError((error) => {
+            console.error('[SpacetimeManager] Connection error:', error);
+            this.handleConnectionError();
+            reject(error);
+          })
+          .build();
 
-      // Subscribe to all game tables
-      this.connection
-        .subscriptionBuilder()
-        .onApplied(() => {
-          console.log('[SpacetimeManager] Subscription applied');
-          this.handleSubscriptionApplied();
-        })
-        .onError((ctx: ErrorContext) => {
-          console.error('[SpacetimeManager] Subscription error:', ctx?.event);
-        })
-        .subscribe(['SELECT * FROM player', 'SELECT * FROM ship', 'SELECT * FROM missile']);
+        // Subscribe to all game tables
+        this.connection
+          .subscriptionBuilder()
+          .onApplied(() => {
+            console.log('[SpacetimeManager] Subscription applied');
+            this.handleSubscriptionApplied();
+          })
+          .onError((ctx: ErrorContext) => {
+            console.error('[SpacetimeManager] Subscription error:', ctx?.event);
+          })
+          .subscribe(['SELECT * FROM player', 'SELECT * FROM ship', 'SELECT * FROM missile']);
 
-      // Register table update handlers for real-time updates
-      this.connection.db.player.onInsert(() => { this.notifyListeners(); });
-      this.connection.db.player.onUpdate(() => { this.notifyListeners(); });
-      this.connection.db.player.onDelete(() => { this.notifyListeners(); });
+        // Register table update handlers for real-time updates
+        this.connection.db.player.onInsert(() => {
+          this.notifyListeners();
+        });
+        this.connection.db.player.onUpdate(() => {
+          this.notifyListeners();
+        });
+        this.connection.db.player.onDelete(() => {
+          this.notifyListeners();
+        });
 
-      this.connection.db.ship.onInsert(() => { this.notifyListeners(); });
-      this.connection.db.ship.onUpdate(() => { this.notifyListeners(); });
-      this.connection.db.ship.onDelete(() => { this.notifyListeners(); });
+        this.connection.db.ship.onInsert(() => {
+          this.notifyListeners();
+        });
+        this.connection.db.ship.onUpdate(() => {
+          this.notifyListeners();
+        });
+        this.connection.db.ship.onDelete(() => {
+          this.notifyListeners();
+        });
 
-      this.connection.db.missile.onInsert(() => { this.notifyListeners(); });
-      this.connection.db.missile.onUpdate(() => { this.notifyListeners(); });
-      this.connection.db.missile.onDelete(() => { this.notifyListeners(); });
-
-      console.log('[SpacetimeManager] build() returned — awaiting onConnect...');
-    } catch (error) {
-      this.isConnecting = false;
-      console.error('[SpacetimeManager] Connection failed:', error);
-      throw error;
-    }
+        this.connection.db.missile.onInsert(() => {
+          this.notifyListeners();
+        });
+        this.connection.db.missile.onUpdate(() => {
+          this.notifyListeners();
+        });
+        this.connection.db.missile.onDelete(() => {
+          this.notifyListeners();
+        });
+      } catch (error) {
+        this.isConnecting = false;
+        reject(error);
+      }
+    });
   }
 
   /**
