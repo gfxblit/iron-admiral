@@ -123,22 +123,30 @@ test.describe('mobile action overlay', () => {
     await expect(interactionStatus).toContainText('Fire mode cancelled', { timeout: 3000 });
   });
 
-  test('R keyboard shortcut attempts radar toggle on selected ship', async ({ page }) => {
-    const canvas = page.locator('#game-canvas');
-    const box = await canvas.boundingBox();
-    if (!box) throw new Error('Canvas not found');
+  test('RADAR button toggles radar on our own ship', async ({ page }) => {
+    // Use programmatic selection to avoid canvas click ambiguity when multiple
+    // ships from previous tests overlap at the same world position (0, 0).
+    await page.evaluate((): void => {
+      // @ts-expect-error - window.spacetimeManager exposed in main.ts
+      const manager = window.spacetimeManager;
+      const localHex: string = manager.getUserIdentity();
+      const ships = manager.getShips();
+      const ourShip = ships.find((s: { ownerId: unknown }) => {
+        const owner = s.ownerId as { toHexString?: () => string };
+        return (owner.toHexString?.() ?? String(s.ownerId)) === localHex;
+      });
+      if (!ourShip) throw new Error('Our ship not found');
+      // @ts-expect-error - window.interactionManager exposed in main.ts
+      window.interactionManager.selectShipById(ourShip.id);
+    });
 
-    const centerX = box.x + box.width / 2;
-    const centerY = box.y + box.height / 2;
-
-    // Select the ship
-    await page.mouse.click(centerX, centerY);
-    await expect(page.locator('#interaction-status')).toContainText('Selected ship', { timeout: 5000 });
-
-    // Press R — should call toggleRadar and show status
-    await page.keyboard.press('r');
-
+    // Wait for selection to be reflected in the status and overlay
     const interactionStatus = page.locator('#interaction-status');
+    await expect(interactionStatus).toContainText('Selected ship', { timeout: 5000 });
+    await expect(page.locator('#mobile-actions')).toBeVisible({ timeout: 3000 });
+
+    // Click the RADAR button
+    await page.locator('#btn-radar').click();
     await expect(interactionStatus).toContainText('Radar toggled', { timeout: 5000 });
   });
 });

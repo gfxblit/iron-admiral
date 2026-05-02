@@ -600,6 +600,15 @@ export class InteractionManager {
   };
 
   /**
+   * Programmatically select a ship by ID — used by E2E tests to bypass canvas hit-testing
+   * ambiguity when multiple ships overlap at the same world position.
+   */
+  public selectShipById = (shipId: bigint): void => {
+    this.selectShip(shipId);
+    this.showStatus(`Selected ship ${shipId}`);
+  };
+
+  /**
    * Cleanup and destroy
    */
   public destroy = (): void => {

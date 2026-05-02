@@ -30,7 +30,13 @@ async function initializeGame() {
   try {
     updateStatus("Connecting...");
     // Connect to SpaceTimeDB
-    await spacetimeManager.connect("ws://localhost:3000");
+    const stdbParam = new URLSearchParams(window.location.search).get("stdb");
+    // If no explicit host given, route through Vite's /v1/ proxy so
+    // non-localhost clients (iPad on LAN) reach SpaceTimeDB via Vite rather than directly.
+    const stdbUrl = stdbParam
+      ? `ws://${stdbParam}`
+      : `ws://${window.location.host}`;
+    await spacetimeManager.connect(stdbUrl);
     updateStatus("Connected");
     console.log("[Main] Connected to SpaceTimeDB");
 
@@ -38,7 +44,9 @@ async function initializeGame() {
     // Placing this inside spacetimeManager.subscribe() would re-initialize on every
     // server tick (10Hz), causing listener explosion.
     if (canvas) {
-      initializeInteractions(canvas, renderer, spacetimeManager);
+      const interactionManager = initializeInteractions(canvas, renderer, spacetimeManager);
+      // @ts-expect-error - Expose to window for console debugging and E2E tests
+      window.interactionManager = interactionManager;
       console.log('[Main] Interaction system initialized');
     }
   } catch (error) {

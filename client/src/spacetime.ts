@@ -67,7 +67,6 @@ export class SpacetimeManager {
    */
   public async connect(wsUrl: string = 'ws://localhost:3000'): Promise<void> {
     if (this.isConnected) {
-      // Idempotent — already connected, nothing to do
       return;
     }
     if (this.isConnecting) {
@@ -79,8 +78,7 @@ export class SpacetimeManager {
     try {
       console.log(`[SpacetimeManager] Connecting to ${wsUrl}...`);
 
-      // Build and establish connection
-      this.connection = await DbConnection.builder()
+      this.connection = DbConnection.builder()
         .withUri(wsUrl)
         .withDatabaseName('iron-admiral')
         .onConnect((_conn: DbConnection, identity: Identity) => {
@@ -113,37 +111,19 @@ export class SpacetimeManager {
         .subscribe(['SELECT * FROM player', 'SELECT * FROM ship', 'SELECT * FROM missile']);
 
       // Register table update handlers for real-time updates
-      this.connection.db.player.onInsert(() => {
-        this.notifyListeners();
-      });
-      this.connection.db.player.onUpdate(() => {
-        this.notifyListeners();
-      });
-      this.connection.db.player.onDelete(() => {
-        this.notifyListeners();
-      });
+      this.connection.db.player.onInsert(() => { this.notifyListeners(); });
+      this.connection.db.player.onUpdate(() => { this.notifyListeners(); });
+      this.connection.db.player.onDelete(() => { this.notifyListeners(); });
 
-      this.connection.db.ship.onInsert(() => {
-        this.notifyListeners();
-      });
-      this.connection.db.ship.onUpdate(() => {
-        this.notifyListeners();
-      });
-      this.connection.db.ship.onDelete(() => {
-        this.notifyListeners();
-      });
+      this.connection.db.ship.onInsert(() => { this.notifyListeners(); });
+      this.connection.db.ship.onUpdate(() => { this.notifyListeners(); });
+      this.connection.db.ship.onDelete(() => { this.notifyListeners(); });
 
-      this.connection.db.missile.onInsert(() => {
-        this.notifyListeners();
-      });
-      this.connection.db.missile.onUpdate(() => {
-        this.notifyListeners();
-      });
-      this.connection.db.missile.onDelete(() => {
-        this.notifyListeners();
-      });
+      this.connection.db.missile.onInsert(() => { this.notifyListeners(); });
+      this.connection.db.missile.onUpdate(() => { this.notifyListeners(); });
+      this.connection.db.missile.onDelete(() => { this.notifyListeners(); });
 
-      console.log('[SpacetimeManager] Connected and subscribed to game tables');
+      console.log('[SpacetimeManager] build() returned — awaiting onConnect...');
     } catch (error) {
       this.isConnecting = false;
       console.error('[SpacetimeManager] Connection failed:', error);
@@ -338,8 +318,8 @@ export class SpacetimeManager {
     }
 
     try {
-      // @ts-expect-error - Reducers are dynamically bound by the SDK
-      this.connection.reducers.fireMissile(shipId, targetX, targetY, targetShipId);
+      // @ts-expect-error - Reducers are dynamically bound by the SDK; object form matches reducer schema
+      this.connection.reducers.fireMissile({ shipId, targetX, targetY, targetShipId });
     } catch (error) {
       console.error('[SpacetimeManager] Error firing missile:', error);
       throw error;
@@ -376,7 +356,6 @@ export class SpacetimeManager {
     }
 
     try {
-      // @ts-expect-error - Reducers are dynamically bound by the SDK
       this.connection.reducers.setWaypoint({ shipId, targetX: x, targetY: y, targetSpeed });
     } catch (error) {
       console.error('[SpacetimeManager] Error setting waypoint:', error);
@@ -393,8 +372,7 @@ export class SpacetimeManager {
     }
 
     try {
-      // @ts-expect-error - Reducers are dynamically bound by the SDK
-      this.connection.reducers.toggleRadar(shipId);
+      this.connection.reducers.toggleRadar({ shipId });
     } catch (error) {
       console.error('[SpacetimeManager] Error toggling radar:', error);
       throw error;
