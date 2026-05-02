@@ -197,6 +197,14 @@ export class InteractionManager {
       return;
     }
 
+    const shipIds = new Set(ships.map((s) => s.id));
+
+    // Clear stale selection when the selected ship no longer exists
+    if (this.selectedShipId !== null && !shipIds.has(this.selectedShipId)) {
+      this.deselectShip();
+      this.showStatus('Selected ship was destroyed');
+    }
+
     // Clear and rebuild the local player's ship set using the authoritative local identity
     this.playerShips.clear();
     for (const ship of ships) {
