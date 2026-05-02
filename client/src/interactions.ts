@@ -34,8 +34,17 @@ export class InteractionManager {
   // Guard to prevent duplicate registration calls from rapid clicks
   private isRegistering: boolean = false;
 
+  // Fire mode state
+  private fireModeActive: boolean = false;
+
   // UI feedback elements
   private statusElement: HTMLElement | null = null;
+
+  // Mobile action overlay elements
+  private mobileActions: HTMLElement | null = null;
+  private radarButton: HTMLButtonElement | null = null;
+  private fireButton: HTMLButtonElement | null = null;
+  private deselectButton: HTMLButtonElement | null = null;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -68,9 +77,19 @@ export class InteractionManager {
       document.body.appendChild(this.statusElement);
     }
 
+    // Create mobile action overlay
+    this.createMobileActions();
+
     // Bind event handlers
     this.canvas.addEventListener('click', this.handleLeftClick);
     this.canvas.addEventListener('contextmenu', this.handleRightClick);
+
+    // Prevent scroll/zoom during gameplay on iOS/touch devices
+    this.canvas.addEventListener('touchstart', this.handleTouchStart, { passive: false });
+    this.canvas.addEventListener('touchend', this.handleTouchEnd, { passive: false });
+
+    // Keyboard shortcuts: R = radar, F = fire mode, Escape = deselect
+    document.addEventListener('keydown', this.handleKeyDown);
 
     // Subscribe to state updates to track player identity and ships
     this.spacetimeManager.subscribe(() => {
@@ -79,6 +98,91 @@ export class InteractionManager {
 
     console.log('[InteractionManager] Initialized');
   }
+
+  /**
+   * Create the floating mobile action overlay with RADAR, FIRE, DESELECT buttons.
+   * Hidden by default; visibility is controlled by updateMobileActionsVisibility().
+   */
+  private createMobileActions = (): void => {
+    // Remove existing overlay if present (e.g., re-init)
+    const existing = document.getElementById('mobile-actions');
+    if (existing) {
+      existing.remove();
+    }
+
+    this.mobileActions = document.createElement('div');
+    this.mobileActions.id = 'mobile-actions';
+    this.mobileActions.style.cssText = `
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 20;
+    `;
+
+    const buttonStyle = `
+      width: 60px;
+      height: 60px;
+      background: rgba(0,0,0,0.8);
+      border: 1px solid #50E3C2;
+      border-radius: 8px;
+      color: #50E3C2;
+      font-family: monospace;
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+      min-width: 44px;
+      min-height: 44px;
+    `;
+
+    this.radarButton = document.createElement('button');
+    this.radarButton.id = 'btn-radar';
+    this.radarButton.textContent = 'RADAR';
+    this.radarButton.style.cssText = buttonStyle;
+    this.radarButton.addEventListener('click', this.handleRadarButton);
+    this.radarButton.addEventListener('touchend', (e) => { e.preventDefault(); this.handleRadarButton(); });
+
+    this.fireButton = document.createElement('button');
+    this.fireButton.id = 'btn-fire';
+    this.fireButton.textContent = 'FIRE';
+    this.fireButton.style.cssText = buttonStyle;
+    this.fireButton.addEventListener('click', this.handleFireButton);
+    this.fireButton.addEventListener('touchend', (e) => { e.preventDefault(); this.handleFireButton(); });
+
+    this.deselectButton = document.createElement('button');
+    this.deselectButton.id = 'btn-deselect';
+    this.deselectButton.textContent = 'DESEL';
+    this.deselectButton.style.cssText = buttonStyle;
+    this.deselectButton.addEventListener('click', this.handleDeselectButton);
+    this.deselectButton.addEventListener('touchend', (e) => { e.preventDefault(); this.handleDeselectButton(); });
+
+    this.mobileActions.appendChild(this.radarButton);
+    this.mobileActions.appendChild(this.fireButton);
+    this.mobileActions.appendChild(this.deselectButton);
+
+    document.body.appendChild(this.mobileActions);
+  };
+
+  /**
+   * Show or hide the mobile actions overlay based on ship selection.
+   */
+  private updateMobileActionsVisibility = (): void => {
+    if (!this.mobileActions) return;
+    if (this.selectedShipId !== null) {
+      this.mobileActions.style.display = 'flex';
+    } else {
+      this.mobileActions.style.display = 'none';
+    }
+  };
 
   /**
    * Update player state from SpacetimeManager.
@@ -196,11 +300,41 @@ export class InteractionManager {
   };
 
   /**
-   * Handle spawn ship or select existing ship
+   * Handle spawn ship or select existing ship.
+   * When fire mode is active, clicking on a ship fires a missile at it;
+   * clicking on empty space cancels fire mode.
    */
   private handleSpawnOrSelect = (canvasX: number, canvasY: number): void => {
     // Check if clicking on an existing ship
     const clickedShip = this.getShipAtCanvasPosition(canvasX, canvasY);
+
+    if (this.fireModeActive) {
+      if (clickedShip && this.selectedShipId !== null) {
+        // Fire a missile at the target ship
+        this.renderer.setFireModeTarget(clickedShip.id);
+        this.spacetimeManager.fireMissile(this.selectedShipId, clickedShip.id)
+          .then(() => {
+            this.showStatus(`Missile fired at ship ${clickedShip.id}`);
+          })
+          .catch((error) => {
+            console.error('[InteractionManager] Error firing missile:', error);
+            this.showStatus('Failed to fire missile');
+          })
+          .finally(() => {
+            // Exit fire mode after shot
+            this.fireModeActive = false;
+            this.renderer.setFireModeTarget(null);
+            this.updateFireButtonStyle();
+          });
+      } else {
+        // Tapped empty space — cancel fire mode
+        this.fireModeActive = false;
+        this.renderer.setFireModeTarget(null);
+        this.updateFireButtonStyle();
+        this.showStatus('Fire mode cancelled');
+      }
+      return;
+    }
 
     if (clickedShip) {
       // Select the clicked ship
@@ -242,6 +376,20 @@ export class InteractionManager {
     this.selectedShipId = shipId;
     // Update renderer to highlight the selected ship
     this.renderer.setSelectedShip(shipId);
+    // Show the mobile action overlay now that a ship is selected
+    this.updateMobileActionsVisibility();
+  };
+
+  /**
+   * Deselect current ship and exit any active modes
+   */
+  private deselectShip = (): void => {
+    this.selectedShipId = null;
+    this.fireModeActive = false;
+    this.renderer.setSelectedShip(null);
+    this.renderer.setFireModeTarget(null);
+    this.updateMobileActionsVisibility();
+    this.updateFireButtonStyle();
   };
 
   /**
@@ -317,6 +465,119 @@ export class InteractionManager {
   };
 
   /**
+   * Handle RADAR button press — toggle radar on selected ship
+   */
+  private handleRadarButton = (): void => {
+    if (this.selectedShipId === null) return;
+    this.spacetimeManager.toggleRadar(this.selectedShipId)
+      .then(() => {
+        this.showStatus('Radar toggled');
+      })
+      .catch((error) => {
+        console.error('[InteractionManager] Error toggling radar:', error);
+        this.showStatus('Failed to toggle radar');
+      });
+  };
+
+  /**
+   * Handle FIRE button press — enter fire mode
+   */
+  private handleFireButton = (): void => {
+    if (this.selectedShipId === null) return;
+    this.fireModeActive = !this.fireModeActive;
+    this.renderer.setFireModeTarget(null);
+    this.updateFireButtonStyle();
+    if (this.fireModeActive) {
+      this.showStatus('FIRE MODE ACTIVE - TAP TARGET');
+    } else {
+      this.showStatus('Fire mode cancelled');
+    }
+  };
+
+  /**
+   * Handle DESELECT button press — clear selection and exit all modes
+   */
+  private handleDeselectButton = (): void => {
+    this.deselectShip();
+    this.showStatus('');
+  };
+
+  /**
+   * Update fire button visual style to reflect active/inactive fire mode
+   */
+  private updateFireButtonStyle = (): void => {
+    if (!this.fireButton) return;
+    if (this.fireModeActive) {
+      this.fireButton.style.border = '2px solid #FF0000';
+      this.fireButton.style.color = '#FF6B6B';
+      this.fireButton.style.animation = 'none';
+    } else {
+      this.fireButton.style.border = '1px solid #50E3C2';
+      this.fireButton.style.color = '#50E3C2';
+    }
+  };
+
+  /**
+   * Handle keyboard shortcuts: R (radar), F (fire mode), Escape (deselect)
+   */
+  private handleKeyDown = (event: KeyboardEvent): void => {
+    switch (event.key.toUpperCase()) {
+      case 'R':
+        this.handleRadarButton();
+        break;
+      case 'F':
+        this.handleFireButton();
+        break;
+      case 'ESCAPE':
+        if (this.fireModeActive) {
+          this.fireModeActive = false;
+          this.renderer.setFireModeTarget(null);
+          this.updateFireButtonStyle();
+          this.showStatus('Fire mode cancelled');
+        } else {
+          this.deselectShip();
+          this.showStatus('');
+        }
+        break;
+    }
+  };
+
+  /**
+   * Handle touch start — prevent default scroll/zoom during gameplay
+   */
+  private handleTouchStart = (event: TouchEvent): void => {
+    event.preventDefault();
+  };
+
+  /**
+   * Handle touch end — map single touch to canvas click
+   */
+  private handleTouchEnd = (event: TouchEvent): void => {
+    event.preventDefault();
+    if (event.changedTouches.length === 0) return;
+
+    const touch = event.changedTouches[0];
+    const rect = this.canvas.getBoundingClientRect();
+    const canvasX = touch.clientX - rect.left;
+    const canvasY = touch.clientY - rect.top;
+
+    const localIdentityHex = this.spacetimeManager.getUserIdentity();
+    const localPlayer = localIdentityHex
+      ? this.spacetimeManager.getPlayer(localIdentityHex)
+      : undefined;
+
+    if (!localPlayer) {
+      if (!this.isRegistering) {
+        this.registerPlayer();
+      } else {
+        this.showStatus('Registering... please wait');
+      }
+    } else {
+      this.handleSpawnOrSelect(canvasX, canvasY);
+    }
+  };
+
+  /**
    * Show status message to user
    */
   private showStatus = (message: string): void => {
@@ -344,6 +605,12 @@ export class InteractionManager {
   public destroy = (): void => {
     this.canvas.removeEventListener('click', this.handleLeftClick);
     this.canvas.removeEventListener('contextmenu', this.handleRightClick);
+    this.canvas.removeEventListener('touchstart', this.handleTouchStart);
+    this.canvas.removeEventListener('touchend', this.handleTouchEnd);
+    document.removeEventListener('keydown', this.handleKeyDown);
+    if (this.mobileActions && this.mobileActions.parentNode) {
+      this.mobileActions.parentNode.removeChild(this.mobileActions);
+    }
   };
 }
 
