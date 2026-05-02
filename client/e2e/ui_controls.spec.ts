@@ -18,7 +18,14 @@ test.describe('mobile action overlay', () => {
       // @ts-expect-error - window.spacetimeManager exposed in main.ts
       const manager = window.spacetimeManager;
       await manager.registerPlayer('UIControlsTester');
-      await new Promise((resolve: (v: void) => void) => setTimeout(resolve, 500));
+      
+      // Poll until local player is confirmed, up to 5 s
+      const localHex: string = manager.getUserIdentity();
+      for (let i = 0; i < 50; i++) {
+        if (manager.getPlayer(localHex)) break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+
       await manager.spawnShip('ArleighBurke', 0, 0);
     });
 
