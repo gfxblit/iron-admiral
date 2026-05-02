@@ -22,8 +22,20 @@ test('spawning a ship updates the UI count', async ({ page }) => {
       // Must register player first
       await manager.registerPlayer('TestPlayer');
 
-      // Give it a tiny bit of time for the registration to be processed
-      await new Promise((resolve: (value: void) => void) => setTimeout(resolve, 500));
+      // Poll until local player is confirmed, up to 5s
+      const localHex = manager.getUserIdentity();
+      let registered = false;
+      for (let i = 0; i < 50; i++) {
+        if (manager.getPlayer(localHex)) {
+          registered = true;
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 100));
+      }
+
+      if (!registered) {
+        throw new Error('Timeout waiting for player registration in E2E test');
+      }
 
       await manager.spawnShip('ArleighBurke', 100, 100);
       return null;

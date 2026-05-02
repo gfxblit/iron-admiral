@@ -48,6 +48,7 @@ export class InteractionManager {
   // Zoom state
   private initialTouchDistance: number | null = null;
   private initialScale: number = 1;
+  private isPinchZooming: boolean = false;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -202,10 +203,8 @@ export class InteractionManager {
       return;
     }
 
-    const shipIds = new Set(ships.map((s) => s.id));
-
     // Clear stale selection when the selected ship no longer exists
-    if (this.selectedShipId !== null && !shipIds.has(this.selectedShipId)) {
+    if (this.selectedShipId !== null && !ships.some((s) => s.id === this.selectedShipId)) {
       this.deselectShip();
       this.showStatus('Selected ship was destroyed');
     }
@@ -238,9 +237,14 @@ export class InteractionManager {
     const canvasX = event.clientX - rect.left;
     const canvasY = event.clientY - rect.top;
 
+    this.processInteraction(canvasX, canvasY);
+  };
+
+  /**
+   * Process a click or tap interaction: register player if needed, or spawn/select.
+   */
+  private processInteraction = (canvasX: number, canvasY: number): void => {
     // Use the local user's identity to determine registration status.
-    // Checking players.length would incorrectly treat other players' presence
-    // as meaning the local user is already registered.
     const localIdentityHex = this.spacetimeManager.getUserIdentity();
     const localPlayer = localIdentityHex
       ? this.spacetimeManager.getPlayer(localIdentityHex)
@@ -581,6 +585,7 @@ export class InteractionManager {
     if (event.touches.length === 2) {
       this.initialTouchDistance = this.getTouchDistance(event.touches[0], event.touches[1]);
       this.initialScale = this.renderer.getScale();
+      this.isPinchZooming = true;
     }
     event.preventDefault();
   };
@@ -614,6 +619,15 @@ export class InteractionManager {
    */
   private handleTouchEnd = (event: TouchEvent): void => {
     event.preventDefault();
+
+    // If we were pinch-zooming, ignore the end of the gesture to prevent accidental actions
+    if (this.isPinchZooming) {
+      if (event.touches.length === 0) {
+        this.isPinchZooming = false;
+      }
+      return;
+    }
+
     if (event.changedTouches.length === 0) return;
 
     const touch = event.changedTouches[0];
@@ -621,20 +635,7 @@ export class InteractionManager {
     const canvasX = touch.clientX - rect.left;
     const canvasY = touch.clientY - rect.top;
 
-    const localIdentityHex = this.spacetimeManager.getUserIdentity();
-    const localPlayer = localIdentityHex
-      ? this.spacetimeManager.getPlayer(localIdentityHex)
-      : undefined;
-
-    if (!localPlayer) {
-      if (!this.isRegistering) {
-        this.registerPlayer();
-      } else {
-        this.showStatus('Registering... please wait');
-      }
-    } else {
-      this.handleSpawnOrSelect(canvasX, canvasY);
-    }
+    this.processInteraction(canvasX, canvasY);
   };
 
   /**

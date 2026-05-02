@@ -12,7 +12,14 @@ test('setting a waypoint updates the ship target', async ({ page }) => {
     // @ts-expect-error - Accessing the singleton instance exposed in main.ts
     const manager = window.spacetimeManager;
     await manager.registerPlayer('InteractionTester');
-    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Poll until local player is confirmed, up to 5s
+    const localHex = manager.getUserIdentity();
+    for (let i = 0; i < 50; i++) {
+      if (manager.getPlayer(localHex)) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    
     await manager.spawnShip('ArleighBurke', 0, 0);
   });
 
