@@ -43,9 +43,7 @@ export class InteractionManager {
 
   // Mobile action overlay elements
   private mobileActions: HTMLElement | null = null;
-  private radarButton: HTMLButtonElement | null = null;
   private fireButton: HTMLButtonElement | null = null;
-  private deselectButton: HTMLButtonElement | null = null;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -145,12 +143,12 @@ export class InteractionManager {
       min-height: 44px;
     `;
 
-    this.radarButton = document.createElement('button');
-    this.radarButton.id = 'btn-radar';
-    this.radarButton.textContent = 'RADAR';
-    this.radarButton.style.cssText = buttonStyle;
-    this.radarButton.addEventListener('click', this.handleRadarButton);
-    this.radarButton.addEventListener('touchend', (e) => { e.preventDefault(); this.handleRadarButton(); });
+    const radarButton = document.createElement('button');
+    radarButton.id = 'btn-radar';
+    radarButton.textContent = 'RADAR';
+    radarButton.style.cssText = buttonStyle;
+    radarButton.addEventListener('click', this.handleRadarButton);
+    radarButton.addEventListener('touchend', (e) => { e.preventDefault(); this.handleRadarButton(); });
 
     this.fireButton = document.createElement('button');
     this.fireButton.id = 'btn-fire';
@@ -159,16 +157,16 @@ export class InteractionManager {
     this.fireButton.addEventListener('click', this.handleFireButton);
     this.fireButton.addEventListener('touchend', (e) => { e.preventDefault(); this.handleFireButton(); });
 
-    this.deselectButton = document.createElement('button');
-    this.deselectButton.id = 'btn-deselect';
-    this.deselectButton.textContent = 'DESEL';
-    this.deselectButton.style.cssText = buttonStyle;
-    this.deselectButton.addEventListener('click', this.handleDeselectButton);
-    this.deselectButton.addEventListener('touchend', (e) => { e.preventDefault(); this.handleDeselectButton(); });
+    const deselectButton = document.createElement('button');
+    deselectButton.id = 'btn-deselect';
+    deselectButton.textContent = 'DESEL';
+    deselectButton.style.cssText = buttonStyle;
+    deselectButton.addEventListener('click', this.handleDeselectButton);
+    deselectButton.addEventListener('touchend', (e) => { e.preventDefault(); this.handleDeselectButton(); });
 
-    this.mobileActions.appendChild(this.radarButton);
+    this.mobileActions.appendChild(radarButton);
     this.mobileActions.appendChild(this.fireButton);
-    this.mobileActions.appendChild(this.deselectButton);
+    this.mobileActions.appendChild(deselectButton);
 
     document.body.appendChild(this.mobileActions);
   };
