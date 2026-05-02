@@ -45,6 +45,10 @@ export class InteractionManager {
   private mobileActions: HTMLElement | null = null;
   private fireButton: HTMLButtonElement | null = null;
 
+  // Zoom state
+  private initialTouchDistance: number | null = null;
+  private initialScale: number = 1;
+
   constructor(
     canvas: HTMLCanvasElement,
     renderer: Canvas2DRenderer,
@@ -61,7 +65,7 @@ export class InteractionManager {
       this.statusElement = document.createElement('div');
       this.statusElement.id = 'interaction-status';
       this.statusElement.style.cssText = `
-        position: absolute;
+        position: fixed;
         top: 80px;
         left: 10px;
         color: #50E3C2;
@@ -82,9 +86,11 @@ export class InteractionManager {
     // Bind event handlers
     this.canvas.addEventListener('click', this.handleLeftClick);
     this.canvas.addEventListener('contextmenu', this.handleRightClick);
+    this.canvas.addEventListener('wheel', this.handleWheel, { passive: false });
 
     // Prevent scroll/zoom during gameplay on iOS/touch devices
     this.canvas.addEventListener('touchstart', this.handleTouchStart, { passive: false });
+    this.canvas.addEventListener('touchmove', this.handleTouchMove, { passive: false });
     this.canvas.addEventListener('touchend', this.handleTouchEnd, { passive: false });
 
     // Keyboard shortcuts: R = radar, F = fire mode, Escape = deselect
@@ -112,7 +118,7 @@ export class InteractionManager {
     this.mobileActions = document.createElement('div');
     this.mobileActions.id = 'mobile-actions';
     this.mobileActions.style.cssText = `
-      position: absolute;
+      position: fixed;
       bottom: 20px;
       right: 20px;
       display: none;
@@ -168,7 +174,9 @@ export class InteractionManager {
     this.mobileActions.appendChild(this.fireButton);
     this.mobileActions.appendChild(deselectButton);
 
-    document.body.appendChild(this.mobileActions);
+    const container = document.getElementById('game-container') || document.body;
+    container.appendChild(this.mobileActions);
+    console.log('[InteractionManager] Mobile actions overlay created and appended to', container.id || 'body');
   };
 
   /**
@@ -176,11 +184,9 @@ export class InteractionManager {
    */
   private updateMobileActionsVisibility = (): void => {
     if (!this.mobileActions) return;
-    if (this.selectedShipId !== null) {
-      this.mobileActions.style.display = 'flex';
-    } else {
-      this.mobileActions.style.display = 'none';
-    }
+    const shouldShow = this.selectedShipId !== null;
+    this.mobileActions.style.display = shouldShow ? 'flex' : 'none';
+    console.log(`[InteractionManager] Mobile actions visibility: ${shouldShow ? 'VISIBLE' : 'HIDDEN'} (Selected: ${this.selectedShipId})`);
   };
 
   /**
@@ -525,6 +531,25 @@ export class InteractionManager {
   };
 
   /**
+   * Handle mouse wheel zoom
+   */
+  private handleWheel = (event: WheelEvent): void => {
+    event.preventDefault();
+    const zoomSpeed = 1.1;
+    const currentScale = this.renderer.getScale();
+    let newScale = currentScale;
+
+    if (event.deltaY < 0) {
+      newScale *= zoomSpeed;
+    } else {
+      newScale /= zoomSpeed;
+    }
+
+    this.renderer.setScale(newScale);
+    this.showStatus(`Zoom: ${Math.round(this.renderer.getScale() * 100)}%`);
+  };
+
+  /**
    * Handle keyboard shortcuts: R (radar), F (fire mode), Escape (deselect)
    */
   private handleKeyDown = (event: KeyboardEvent): void => {
@@ -553,7 +578,35 @@ export class InteractionManager {
    * Handle touch start — prevent default scroll/zoom during gameplay
    */
   private handleTouchStart = (event: TouchEvent): void => {
+    if (event.touches.length === 2) {
+      this.initialTouchDistance = this.getTouchDistance(event.touches[0], event.touches[1]);
+      this.initialScale = this.renderer.getScale();
+    }
     event.preventDefault();
+  };
+
+  /**
+   * Handle touch move — implement pinch-to-zoom
+   */
+  private handleTouchMove = (event: TouchEvent): void => {
+    if (event.touches.length === 2 && this.initialTouchDistance !== null) {
+      event.preventDefault();
+      const currentDistance = this.getTouchDistance(event.touches[0], event.touches[1]);
+      const zoomFactor = currentDistance / this.initialTouchDistance;
+      const newScale = this.initialScale * zoomFactor;
+
+      this.renderer.setScale(newScale);
+      this.showStatus(`Zoom: ${Math.round(this.renderer.getScale() * 100)}%`);
+    }
+  };
+
+  /**
+   * Calculate distance between two touch points
+   */
+  private getTouchDistance = (t1: Touch, t2: Touch): number => {
+    const dx = t1.clientX - t2.clientX;
+    const dy = t1.clientY - t2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
   };
 
   /**
@@ -627,7 +680,9 @@ export class InteractionManager {
   public destroy = (): void => {
     this.canvas.removeEventListener('click', this.handleLeftClick);
     this.canvas.removeEventListener('contextmenu', this.handleRightClick);
+    this.canvas.removeEventListener('wheel', this.handleWheel);
     this.canvas.removeEventListener('touchstart', this.handleTouchStart);
+    this.canvas.removeEventListener('touchmove', this.handleTouchMove);
     this.canvas.removeEventListener('touchend', this.handleTouchEnd);
     document.removeEventListener('keydown', this.handleKeyDown);
     if (this.mobileActions && this.mobileActions.parentNode) {

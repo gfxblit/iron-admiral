@@ -16,11 +16,27 @@ A passing run is required before marking a plan complete. On failure, inspect th
 
 ## Local Prerequisite (per Phase 3 D-01)
 
-SpaceTimeDB does NOT auto-start for local development. Before running `pnpm test:e2e`, the developer (or agent) MUST start a local SpaceTimeDB instance on port 3000:
+SpaceTimeDB does NOT auto-start for local development. Before running `pnpm test:e2e`, the developer (or agent) MUST start a local SpaceTimeDB instance on port 3000 and publish the module.
+
+The canonical way to do both:
 
 ```
-spacetime start --local
-spacetime publish iron-admiral --local
+make publish
+```
+
+Or to start the full dev environment (SpaceTimeDB + Vite):
+
+```
+make dev
+```
+
+To stop everything: `make stop`
+
+Raw commands (if not using make):
+```
+spacetime start --in-memory &
+# wait for http://127.0.0.1:3000/v1/ping to respond, then:
+cd server && spacetime publish iron-admiral -s http://127.0.0.1:3000 --yes --no-config --anonymous
 ```
 
 Tests assume the backend is already running and the `iron-admiral` module is published. Tests will fail with connection-timeout errors if these steps are skipped.

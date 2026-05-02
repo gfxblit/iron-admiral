@@ -29,7 +29,7 @@ export class Canvas2DRenderer {
   // Camera/viewport settings
   private centerX: number;
   private centerY: number;
-  private scale: number = 1; // pixels per game world unit
+  private scale: number = 0.2; // pixels per game world unit
 
   // Interaction state
   private selectedShipId: bigint | null = null;
@@ -152,7 +152,7 @@ export class Canvas2DRenderer {
    * Set zoom/scale level (pixels per world unit)
    */
   public setScale(scale: number): void {
-    this.scale = Math.max(0.1, scale);
+    this.scale = Math.max(0.05, Math.min(2.0, scale));
   }
 
   /**
@@ -255,9 +255,13 @@ export class Canvas2DRenderer {
   private renderShip(ship: Ship): void {
     const [canvasX, canvasY] = this.worldToCanvas(ship.x, ship.y);
 
-    // Ship size - larger for carrier, smaller for destroyer
+    // Ship size in world units - larger for carrier, smaller for destroyer
     const isCarrier = 'Carrier' in ship.shipClass;
-    const shipSize = isCarrier ? 20 : 15;
+    const baseWorldSize = isCarrier ? 40 : 30; // Doubled so at scale 0.5 it looks like original
+    
+    // Calculate pixel size based on scale, but maintain a minimum visibility
+    const minPixelSize = 5;
+    const shipSize = Math.max(baseWorldSize * this.scale, minPixelSize);
 
     // Choose color based on ship class
     const fillColor = isCarrier ? this.colors.carrierShip : this.colors.arleighBurkeShip;

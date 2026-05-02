@@ -20,7 +20,7 @@ test('setting a waypoint updates the ship target', async ({ page }) => {
   await expect(page.locator('#ships-count')).not.toHaveText('0', { timeout: 10000 });
 
   // Click on the center of the canvas to select the ship (spawned at 0,0 which is likely center)
-  const canvas = page.locator('canvas');
+  const canvas = page.locator('#game-canvas');
   const box = await canvas.boundingBox();
   if (!box) throw new Error('Canvas not found');
 

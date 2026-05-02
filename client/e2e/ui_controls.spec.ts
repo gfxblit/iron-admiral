@@ -156,4 +156,62 @@ test.describe('mobile action overlay', () => {
     await page.locator('#btn-radar').click();
     await expect(interactionStatus).toContainText('Radar toggled', { timeout: 5000 });
   });
+
+  test('firing a missile at a target ship launches it', async ({ page }) => {
+    // Spawn a second ship to act as a target at (200, 0)
+    await page.evaluate(async () => {
+      // @ts-expect-error - window.spacetimeManager exposed in main.ts
+      const manager = window.spacetimeManager;
+      await manager.spawnShip('Carrier', 200, 0);
+    });
+
+    // Wait for the second ship to appear
+    await expect(page.locator('#ships-count')).toHaveText(/[2-9]|\d{2,}/, { timeout: 10000 });
+
+    // Programmatically select our first ship (at 0,0)
+    await page.evaluate((): void => {
+      // @ts-expect-error - window.spacetimeManager exposed in main.ts
+      const manager = window.spacetimeManager;
+      const localHex: string = manager.getUserIdentity();
+      const ships = manager.getShips();
+      const ourShip = ships.find((s: { ownerId: unknown }) => {
+        const owner = s.ownerId as { toHexString?: () => string };
+        return (owner.toHexString?.() ?? String(s.ownerId)) === localHex;
+      });
+      if (!ourShip) throw new Error('Our ship not found');
+      // @ts-expect-error - window.interactionManager exposed in main.ts
+      window.interactionManager.selectShipById(ourShip.id);
+    });
+
+    await expect(page.locator('#interaction-status')).toContainText('Selected ship', { timeout: 5000 });
+
+    // Click FIRE button to enter fire mode
+    await page.locator('#btn-fire').click();
+    await expect(page.locator('#interaction-status')).toContainText('FIRE MODE ACTIVE', { timeout: 3000 });
+
+    // Click on the target ship (at 200,0 in world space)
+    // We need to calculate canvas coordinates for (200,0)
+    // In our tests, 0,0 is at canvas center.
+    const canvas = page.locator('#game-canvas');
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('Canvas not found');
+
+    const centerX = box.x + box.width / 2;
+    const centerY = box.y + box.height / 2;
+    
+    // Get current scale to calculate canvas position of target at (200, 0)
+    const scale = await page.evaluate(() => {
+      // @ts-expect-error - window.renderer exposed in main.ts
+      return window.renderer.getScale();
+    });
+    
+    const targetX = centerX + 200 * scale;
+    const targetY = centerY;
+
+    await page.mouse.click(targetX, targetY);
+
+    // Verify missile count increases
+    await expect(page.locator('#missiles-count')).not.toHaveText('0', { timeout: 15000 });
+    await expect(page.locator('#interaction-status')).toContainText('Missile fired', { timeout: 5000 });
+  });
 });

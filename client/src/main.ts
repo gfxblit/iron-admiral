@@ -17,6 +17,8 @@ document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
 
 // Initialize renderer and store reference for lifecycle management
 const renderer = initializeRenderer("app");
+// @ts-expect-error - Expose to window for console debugging and E2E tests
+window.renderer = renderer;
 
 // Initialize SpaceTimeDB connection
 const spacetimeManager = SpacetimeManager.getInstance();
