@@ -24,6 +24,7 @@ export class Canvas2DRenderer {
   private animationFrameId: number | null = null;
   private spacetimeManager: SpacetimeManager;
   private isRunning: boolean = false;
+  private resizeListener: (() => void) | null = null;
 
   // Camera/viewport settings
   private centerX: number;
@@ -115,6 +116,25 @@ export class Canvas2DRenderer {
 
     this.isRunning = false;
     console.log('[Renderer] Render loop stopped');
+  }
+
+  /**
+   * Set the resize listener for cleanup
+   */
+  public setResizeListener(listener: () => void): void {
+    this.resizeListener = listener;
+  }
+
+  /**
+   * Cleanup and destroy the renderer
+   */
+  public destroy(): void {
+    this.stop();
+    if (this.resizeListener) {
+      window.removeEventListener('resize', this.resizeListener);
+      this.resizeListener = null;
+    }
+    console.log('[Renderer] Renderer destroyed and listeners removed');
   }
 
   /**
@@ -536,6 +556,7 @@ export function initializeRenderer(containerId: string = 'app'): Canvas2DRendere
 
   // Create renderer
   const renderer = new Canvas2DRenderer(canvas);
+  renderer.setResizeListener(resizeCanvas);
 
   // Start rendering
   renderer.start();

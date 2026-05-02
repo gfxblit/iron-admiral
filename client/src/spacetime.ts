@@ -96,6 +96,8 @@ export class SpacetimeManager {
           })
           .onConnectError((error) => {
             console.error('[SpacetimeManager] Connection error:', error);
+            this.isConnecting = false;
+            this.isConnected = false;
             this.handleConnectionError();
             reject(error);
           })
